@@ -1,137 +1,124 @@
-# ZCode Mobile
+<h1 align="center">ZCode Mobile</h1>
 
-Unofficial Android Remote Client for ZCode.
+<p align="center">Unofficial Android remote client for controlling ZCode Desktop sessions.</p>
 
-ZCode Mobile allows users to remotely control their ZCode Desktop sessions from Android devices.
+<p align="center">
+  <a href="./README.md">English</a> | <a href="./README.zh-CN.md">简体中文</a>
+</p>
 
-This app is **not** a coding agent running on the phone. The phone is a control surface. ZCode Desktop on your computer remains the execution environment for code, terminal, Git, files, browser, MCP, Skills, and Agent work.
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-4B5563?style=flat-square" alt="Platform: Android 8.0+">
+  <img src="https://img.shields.io/badge/Target%20SDK-API%2036-4B5563?style=flat-square" alt="Target SDK: API 36">
+  <img src="https://img.shields.io/badge/Kotlin-2.3.21-3776AB?style=flat-square" alt="Kotlin: 2.3.21">
+  <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-3776AB?style=flat-square" alt="Jetpack Compose">
+</p>
 
-```
-Android App
-  → ZCode Remote Control / Remote Web
-    → ZCode Desktop on your computer
-      → local code, terminal, Git, files, browser, MCP, Skill, Agent
-```
+ZCode Mobile allows developers to monitor and control their ZCode Desktop coding sessions from an Android device. The phone functions strictly as a mobile control surface, while the desktop workstation executes code, runs terminal workflows, manages Git repositories, and orchestrates Agent tasks.
 
-## Features
+## Highlights
 
-- Scan a ZCode Remote Control QR code
-- Paste a Remote URL
-- Save the connection with encrypted storage
-- Auto-open the last session on launch
-- Load the official ZCode Remote page in a WebView
-- Back / forward, refresh, reconnect
-- Network and Remote error handling
-- Speech-to-text task input
-- Share-to-app entry
-- Task completed notification architecture
-- Approval request model + demo UI
-- Artifact preview (Markdown, HTML, image, PDF, code, JSON)
-- Settings for voice, notifications, downloads, and WebView data
+| Highlight | Why it matters |
+|---|---|
+| Zero-setup pairing | Scan a QR code or paste a Remote URL to establish an encrypted session instantly. |
+| Hardware-backed security | Connection tokens are encrypted using AES-GCM via Android Keystore and never written in plaintext. |
+| Hands-free task input | Integrated speech-to-text enables natural voice prompts to be dispatched directly to your agent. |
+| System share integration | Forward text snippets, logs, and instructions directly from other mobile apps to your workspace. |
+| Comprehensive previews | Built-in rendering support for Markdown, HTML, images, PDF documents, code, and JSON artifacts. |
 
 ## Architecture
 
+```text
+┌───────────────────────────────┐                 ┌───────────────────────────────┐
+│        Android Client         │                 │         ZCode Desktop         │
+│  (Control Surface / API 26+)  │                 │    (Local Execution Engine)   │
+├───────────────────────────────┤                 ├───────────────────────────────┤
+│  Compose UI & Navigation      │                 │  Agent Core & Tool Runner     │
+│  CameraX & Barcode Scanner    │──[Remote URL]──▶│  Integrated Terminal & Git   │
+│  SpeechRecognizer Task Input  │                 │  MCP Servers & Skills Engine  │
+│  Encrypted Keystore Storage   │◀─[Status/Data]──│  Local Workspace & Browser    │
+│  Embedded WebView Controller  │                 │  Desktop Remote Web Server    │
+└───────────────────────────────┘                 └───────────────────────────────┘
 ```
-Android phone = controller
-ZCode Desktop = executor
-```
 
-MVP stack:
+The application communicates directly with the official ZCode Remote Control endpoint via an embedded WebView. It does not reverse-engineer private protocols or alter desktop application binaries.
 
-- Kotlin
-- Jetpack Compose + Material 3
-- Navigation Compose
-- Android WebView (official Remote Control page)
-- CameraX + ML Kit barcode scanning
-- Android SpeechRecognizer
-- EncryptedSharedPreferences (Android Keystore)
-- DataStore
-- WorkManager
-- Notification API
+## Quick Install
 
-The first version does **not** reverse-engineer ZCode, forge private APIs, or patch the desktop app. If ZCode later publishes an official API, SDK, WebSocket protocol, or deep link, this client can grow into a native remote client.
+Minimum requirement: Android 8.0 (API level 26) or higher.
 
-## Installation
+1. Build or download the debug APK:
+   ```text
+   app/build/outputs/apk/debug/app-debug.apk
+   ```
+2. Enable installation from unknown sources on your Android device.
+3. Transfer the APK to your device and run the installer.
 
-1. Enable unknown sources / install from this computer on your Android device.
-2. Copy `app/build/outputs/apk/debug/app-debug.apk` to the phone.
-3. Install the APK.
+## Quick Start
 
-Minimum Android version: **8.0 (API 26)**.
+1. Open ZCode Desktop on your computer and enable **Remote Control**.
+2. Launch ZCode Mobile on your Android device.
+3. Tap **Scan QR** to capture the desktop screen code, or paste the `http://` / `https://` Remote URL.
+4. Tap **Connect** to load the official session workspace.
+5. Review task execution and send instructions directly to your desktop agent.
 
-## Build
+## Workflow & Operations
 
-Requirements:
+### Voice Task Dispatch
 
+1. Open an active connection session.
+2. Tap **Voice Task** from the toolbar.
+3. Speak your prompt or coding instruction into the device microphone.
+4. Review the transcribed text and tap **Send to ZCode**.
+
+### Artifact Review
+
+The client inspects rendered outputs across multiple formats:
+- Markdown and rich text reports
+- Source code snippets and JSON structures
+- Static image assets and PDF documents
+
+## Security & Privacy
+
+- Sensitive credentials: All Remote URLs and tokens are encrypted with AES-GCM inside Android Keystore.
+- Output sanitization: UI views automatically redact path tokens, and debug logs strip authentication headers, cookies, and session IDs.
+- Network policy: HTTPS sessions strictly reject mixed HTTP content. Cleartext HTTP traffic is limited to local area networks (LAN) per Android network security configuration.
+
+## Build from Source
+
+Prerequisites:
 - JDK 17
-- Android SDK with `platforms;android-36` and Build Tools 36
-- Network access to Google Maven
+- Android SDK with Platform 36 and Build Tools 36
+- Configured `local.properties` pointing to your Android SDK directory:
+  ```properties
+  sdk.dir=/path/to/Android/sdk
+  ```
+
+Build commands:
 
 ```bash
-export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
-export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"
+# Build Debug APK
 ./gradlew assembleDebug
-```
 
-Debug APK:
-
-```
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-Release APK (locally signed; replace the keystore before publishing):
-
-```bash
+# Build Release APK (locally signed with debug keystore)
 ./gradlew assembleRelease
 ```
 
-Output:
-
-```
-app/build/outputs/apk/release/app-release.apk
-```
-
-`local.properties` must contain your SDK path:
-
-```
-sdk.dir=/path/to/Android/sdk
-```
-
-## Usage
-
-1. On the computer, open ZCode Desktop and enable **Remote Control**.
-2. On the phone, open ZCode Mobile.
-3. Scan the QR code, or paste the Remote URL (`http://` or `https://`).
-4. Tap **连接**, then **打开 ZCode**.
-5. Use the official Remote page to talk to the desktop agent.
-6. Optional: tap **语音任务**, speak, then **发送到 ZCode**.
-
-If a Remote URL is already saved, launch goes straight to the Remote page.
-
-## Security
-
-- Remote URLs are encrypted with AES-GCM. The key is stored in Android Keystore and never written to disk in plaintext.
-- UI redacts path tokens. Logs never print tokens, cookies, Authorization headers, or session IDs.
-- Release builds keep sensitive logging off.
-- HTTPS Remote pages block mixed HTTP content.
-- `file://` and content access stay off unless a future setting explicitly needs them.
-- LAN Remote Control often uses HTTP on a private network; cleartext is allowed for that case only at the OS network-security layer.
-
-This client talks only to the Remote URL you provide. It does not include a hidden C2, account dump, or unofficial ZCode protocol.
+Build outputs:
+- Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
+- Release APK: `app/build/outputs/apk/release/app-release.apk`
 
 ## Roadmap
 
-- Native client if ZCode publishes an official remote protocol
-- Real task-status stream instead of demo notifications
-- Real permission-approval protocol
-- Richer artifact sync from the desktop session
-- Multi-device profiles
-- Biometric unlock for saved connections
+- Native communication protocol adapter if ZCode releases an official API or SDK
+- Live bi-directional task status streaming
+- Interactive permission and tool approval workflows
+- Expanded multi-device session profiles
+- Biometric authentication (fingerprint / face unlock) for saved connections
 
 ## Disclaimer
 
-This is an unofficial community client for ZCode.
+This is an unofficial, community-driven client for ZCode. ZCode and associated trademarks are the property of their respective owners. This project is not affiliated with or endorsed by the creators of ZCode.
 
-ZCode and related trademarks belong to their respective owners.
+## Star History
 
-This project does not impersonate an official ZCode product.
+[![Star History Chart](https://api.star-history.com/svg?repos=245678000000%2FZCode-Mobile&type=Date)](https://star-history.com/#245678000000/ZCode-Mobile&Date)
