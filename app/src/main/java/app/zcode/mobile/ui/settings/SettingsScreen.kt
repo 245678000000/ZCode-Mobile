@@ -54,6 +54,7 @@ fun SettingsScreen(
     onDemoNotification: () -> Unit,
     onDemoApproval: () -> Unit,
     onPreviewSample: () -> Unit,
+    onDeveloper: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val notifyPermission = rememberLauncherForActivityResult(
@@ -101,14 +102,16 @@ fun SettingsScreen(
             ToggleRow("授权请求通知", settings.approvalNotifications) {
                 scope.launch { store.setApprovalNotifications(it) }
             }
-            TextButton(onClick = {
-                if (Build.VERSION.SDK_INT >= 33) {
-                    notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    onDemoNotification()
-                }
-            }) { Text("发送演示任务通知", color = Sand) }
-            TextButton(onClick = onDemoApproval) { Text("打开演示授权请求", color = Sand) }
+            if (BuildConfig.DEBUG || settings.developerMode) {
+                TextButton(onClick = {
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        onDemoNotification()
+                    }
+                }) { Text("发送演示任务通知", color = Sand) }
+                TextButton(onClick = onDemoApproval) { Text("打开演示授权请求", color = Sand) }
+            }
 
             SectionLabel("Security")
             ToggleRow("允许下载文件", settings.allowDownloads) {
@@ -121,6 +124,14 @@ fun SettingsScreen(
 
             SectionLabel("Preview")
             TextButton(onClick = onPreviewSample) { Text("打开示例 Markdown", color = Sand) }
+
+            if (BuildConfig.DEBUG) {
+                SectionLabel("Developer")
+                ToggleRow("Developer Mode", settings.developerMode) {
+                    scope.launch { store.setDeveloperMode(it) }
+                }
+                TextButton(onClick = onDeveloper) { Text("打开 Debug Panel", color = Sand) }
+            }
 
             SectionLabel("About")
             QuietCard {

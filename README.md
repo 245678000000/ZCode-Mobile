@@ -24,10 +24,25 @@ Android App
 - Network and Remote error handling
 - Speech-to-text task input
 - Share-to-app entry
-- Task completed notification architecture
-- Approval request model + demo UI
+- Structured task list from visible Remote page state (v0.2)
+- Task / approval / artifact event detection via DOM observer (v0.2)
+- Real task-completed and approval notifications (v0.2)
 - Artifact preview (Markdown, HTML, image, PDF, code, JSON)
 - Settings for voice, notifications, downloads, and WebView data
+
+## v0.2
+
+- Task event detection from the Remote page (MutationObserver, no private API)
+- Approval detection with a two-signal rule (dialog/buttons/waiting/command)
+- Artifact detection from visible file links
+- Structured Home / Task Detail UI
+- Notification integration for TaskCompleted, TaskFailed, ApprovalRequired
+- Developer debug panel (debug builds)
+- Unit tests for parse, status, dedupe, approval, artifacts, URL, storage codec
+
+Foreground only: Android may pause WebView JavaScript when the app is backgrounded. v0.2 does **not** claim realtime background monitoring, and does not use a persistent foreground service or wake lock.
+
+If the observer cannot read the page, the WebView still works. Native task UI simply stays empty instead of showing fake data.
 
 ## Architecture
 
@@ -44,7 +59,8 @@ MVP stack:
 - Android WebView (official Remote Control page)
 - CameraX + ML Kit barcode scanning
 - Android SpeechRecognizer
-- EncryptedSharedPreferences (Android Keystore)
+- Android Keystore AES-GCM
+- DOM observer + JavaScript bridge (visible page state only)
 - DataStore
 - WorkManager
 - Notification API

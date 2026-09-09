@@ -1,0 +1,61 @@
+{
+  "debounceMs": 500,
+  "taskTitle": [
+    "[data-testid*='task-title']",
+    "[data-testid*='session-title']",
+    "[data-testid*='task'] [data-testid*='title']",
+    "[aria-label*='task']",
+    "[aria-label*='任务']",
+    "h1",
+    "h2"
+  ],
+  "taskStatus": [
+    "[data-testid*='status']",
+    "[data-status]",
+    "[aria-label*='status']",
+    "[aria-label*='状态']"
+  ],
+  "taskRow": [
+    "[data-testid*='task-item']",
+    "[data-testid*='task-row']",
+    "[role='listitem']",
+    "[role='option']"
+  ],
+  "approvalDialog": [
+    "[data-testid*='approval']",
+    "[data-testid*='permission']",
+    "[data-testid*='confirm']",
+    "[role='dialog']",
+    "[role='alertdialog']",
+    "[aria-modal='true']"
+  ],
+  "approvalAllowButton": [
+    "[data-testid*='allow']",
+    "[data-testid*='approve']",
+    "[data-testid*='confirm']",
+    "button[aria-label*='Allow']",
+    "button[aria-label*='允许']"
+  ],
+  "approvalRejectButton": [
+    "[data-testid*='reject']",
+    "[data-testid*='deny']",
+    "button[aria-label*='Reject']",
+    "button[aria-label*='拒绝']"
+  ],
+  "artifact": [
+    "[data-testid*='artifact']",
+    "[data-testid*='file']",
+    "a[download]",
+    "a[href$='.md']",
+    "a[href$='.png']",
+    "a[href$='.pdf']",
+    "a[href$='.html']",
+    "a[href$='.json']"
+  ],
+  "agentMessage": [
+    "[data-testid*='message']",
+    "[data-testid*='assistant']",
+    "[data-role='assistant']",
+    "[aria-label*='assistant']"
+  ]
+}

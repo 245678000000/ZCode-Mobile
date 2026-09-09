@@ -10,4 +10,6 @@ object Routes {
     const val Preview = "preview"
     const val Approval = "approval"
     const val Settings = "settings"
+    const val TaskDetail = "task"
+    const val Developer = "developer"
 }

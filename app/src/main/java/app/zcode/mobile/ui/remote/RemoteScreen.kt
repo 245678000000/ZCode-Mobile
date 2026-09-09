@@ -38,8 +38,10 @@ import android.net.Uri
 import app.zcode.mobile.data.AppSettings
 import app.zcode.mobile.remote.RemoteErrorKind
 import app.zcode.mobile.remote.RemotePageState
+import app.zcode.mobile.model.ConnectionState
 import app.zcode.mobile.remote.RemoteWebConfig
 import app.zcode.mobile.remote.SessionManager
+import app.zcode.mobile.remote.ZCodeDomObserver
 import app.zcode.mobile.remote.ZCodeWebBridge
 import app.zcode.mobile.remote.ZCodeWebView
 import app.zcode.mobile.ui.components.ErrorPanel
@@ -57,9 +59,12 @@ fun RemoteScreen(
     online: Boolean,
     sessionManager: SessionManager,
     bridge: ZCodeWebBridge,
+    observer: ZCodeDomObserver,
+    retainedWebView: WebView?,
     pendingInject: String?,
     onConsumeInject: () -> String?,
     onConnected: (Boolean) -> Unit,
+    onConnection: (ConnectionState) -> Unit,
     onDownload: (String, String?, String?) -> Unit,
     onWebView: (WebView) -> Unit,
     onBackToHome: () -> Unit,
@@ -178,8 +183,11 @@ fun RemoteScreen(
                     sessionManager = sessionManager,
                     bridge = bridge,
                     modifier = Modifier.fillMaxSize(),
+                    observer = observer,
+                    retainedWebView = retainedWebView,
                     onState = { pageState = it },
                     onDownload = onDownload,
+                    onConnection = onConnection,
                     webViewRef = {
                         webView = it
                         onWebView(it)
