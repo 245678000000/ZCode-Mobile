@@ -70,8 +70,8 @@ The first version does **not** reverse-engineer ZCode, forge private APIs, or pa
 ## Installation
 
 1. Enable unknown sources / install from this computer on your Android device.
-2. Copy `app/build/outputs/apk/debug/app-debug.apk` to the phone.
-3. Install the APK.
+2. Download the pre-built APK (`zcode-mobile-*-release.apk`) directly from [GitHub Releases](https://github.com/245678000000/ZCode-Mobile/releases), or compile it locally (`app/build/outputs/apk/release/app-release.apk`).
+3. Install the APK on your phone.
 
 Minimum Android version: **8.0 (API 26)**.
 
