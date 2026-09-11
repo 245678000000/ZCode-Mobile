@@ -19,9 +19,17 @@ import app.zcode.mobile.model.TaskWaiting
 import app.zcode.mobile.model.ZCodeEvent
 
 object PageSnapshotReducer {
+    /**
+     * Diffs two page snapshots into events.
+     *
+     * When [previous] is null the snapshot is a baseline: tasks are created so the UI can
+     * show them, but terminal events (completed / failed) are NOT emitted — every task the
+     * page already listed as finished would otherwise fire a "just completed" notification.
+     */
     fun diff(previous: PageSnapshot?, current: PageSnapshot): List<ZCodeEvent> {
         val out = mutableListOf<ZCodeEvent>()
         val ts = current.timestamp
+        val baseline = previous == null
 
         if (!current.sessionTitle.isNullOrBlank()) {
             val sid = current.sessionId ?: current.sessionTitle.hashCode().toString()
@@ -60,10 +68,10 @@ object PageSnapshotReducer {
                         summary = task.step,
                         timestamp = ts,
                     )
-                    TaskStatus.COMPLETED -> if (old == null || TaskStatusMapper.fromText(old.statusText) != TaskStatus.COMPLETED) {
+                    TaskStatus.COMPLETED -> if (!baseline && (old == null || TaskStatusMapper.fromText(old.statusText) != TaskStatus.COMPLETED)) {
                         out += TaskCompleted(taskId = task.id, title = task.title, summary = task.step, timestamp = ts)
                     }
-                    TaskStatus.FAILED -> if (old == null || TaskStatusMapper.fromText(old.statusText) != TaskStatus.FAILED) {
+                    TaskStatus.FAILED -> if (!baseline && (old == null || TaskStatusMapper.fromText(old.statusText) != TaskStatus.FAILED)) {
                         out += TaskFailed(taskId = task.id, title = task.title, summary = task.step, timestamp = ts)
                     }
                     else -> Unit
@@ -109,8 +117,8 @@ object PageSnapshotReducer {
         val prevHint = previous?.connectionHint?.lowercase()
         val currHint = current.connectionHint?.lowercase()
         if (currHint == "expired" || currHint == "lost" || currHint == "error") {
-            if (prevHint != currHint) {
-                out += ConnectionLost(reason = currHint, timestamp = ts)
+            if (prevHint != currHint || previous.errorText != current.errorText) {
+                out += ConnectionLost(reason = current.errorText?.ifBlank { null } ?: currHint, timestamp = ts)
             }
         } else if (currHint == "ok" || currHint == "connected") {
             if (prevHint == "expired" || prevHint == "lost" || prevHint == "error") {

@@ -74,6 +74,7 @@ fun QRScanner(
                             )
                             .build()
                         analysis.setAnalyzer(cameraExecutor) { proxy ->
+                            @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
                             val media = proxy.image
                             if (media != null && !handled.get()) {
                                 val image = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)

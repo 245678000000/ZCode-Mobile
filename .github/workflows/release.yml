@@ -7,13 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (例如 v0.2.0)'
+        description: 'Release Tag（留空则使用 app/build.gradle.kts 中的 versionName）'
         required: false
-        default: 'v0.2.0'
+        default: ''
       release_title:
-        description: 'Release Title'
+        description: 'Release Title（留空则为 "ZCode Mobile <tag>"）'
         required: false
-        default: 'ZCode Mobile v0.2.0'
+        default: ''
 
 permissions:
   contents: write
@@ -42,29 +42,40 @@ jobs:
       - name: Accept Android SDK Licenses & Install Platform 36
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Generate Debug Keystore for Release signing
+      # The release keystore comes from repository secrets so every Release is signed with the
+      # SAME key and users can upgrade in place. Set these four secrets once:
+      #   RELEASE_KEYSTORE_BASE64  — `base64 -i app/keystore/zcode-mobile-release.jks`
+      #   RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD
+      - name: Restore release keystore
+        id: keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkey -v -keystore ~/.android/debug.keystore \
-              -alias androiddebugkey \
-              -storepass android \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::RELEASE_KEYSTORE_BASE64 secret is not set. A Release signed with a throwaway key cannot be upgraded by users."
+            exit 1
           fi
+          mkdir -p "$RUNNER_TEMP/keystore"
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore/release.jks"
+          echo "path=$RUNNER_TEMP/keystore/release.jks" >> "$GITHUB_OUTPUT"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
       - name: Build APKs with Gradle
+        env:
+          RELEASE_STORE_FILE: ${{ steps.keystore.outputs.path }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease assembleDebug --stacktrace
 
       - name: Package Release Assets
@@ -72,13 +83,14 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # 提取当前 Tag
+          VERSION_NAME="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n1)"
+
           if [ -n "${{ github.event.inputs.tag_name }}" ]; then
             TAG_NAME="${{ github.event.inputs.tag_name }}"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF#refs/tags/}"
           else
-            TAG_NAME="v0.2.0"
+            TAG_NAME="v${VERSION_NAME}"
           fi
 
           if [ -n "${{ github.event.inputs.release_title }}" ]; then
@@ -90,13 +102,9 @@ jobs:
           echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
           echo "REL_TITLE=${REL_TITLE}" >> $GITHUB_ENV
 
-          # 复制并规范命名 APK 文件
           cp app/build/outputs/apk/release/app-release.apk release-assets/zcode-mobile-${TAG_NAME}-release.apk
           cp app/build/outputs/apk/debug/app-debug.apk release-assets/zcode-mobile-${TAG_NAME}-debug.apk
-          cp app/build/outputs/apk/release/app-release.apk release-assets/app-release.apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-assets/app-debug.apk
 
-          # 生成 SHA256 校验和文件
           cd release-assets
           sha256sum *.apk > sha256-checksums.txt
           echo "=== Generated Checksums ==="

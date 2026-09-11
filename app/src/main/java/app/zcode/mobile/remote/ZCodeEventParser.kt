@@ -151,6 +151,7 @@ object ZCodeEventParser {
                 url = SensitiveSanitizer.url(obj.optString("url")),
                 title = SensitiveSanitizer.text(obj.optString("title"), 120),
                 connectionHint = obj.optString("connectionHint").ifBlank { null },
+                errorText = obj.optString("errorText").ifBlank { null }?.let { SensitiveSanitizer.text(it, 200) },
                 sessionId = obj.optString("sessionId").ifBlank { null },
                 sessionTitle = obj.optString("sessionTitle").ifBlank { null }?.let { SensitiveSanitizer.text(it) },
                 tasks = tasks,

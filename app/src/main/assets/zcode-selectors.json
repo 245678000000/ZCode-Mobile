@@ -57,5 +57,18 @@
     "[data-testid*='assistant']",
     "[data-role='assistant']",
     "[aria-label*='assistant']"
+  ],
+  "errorBanner": [
+    "[data-testid*='error']",
+    "[role='alert']",
+    ".error-banner",
+    "[data-testid*='model-error']",
+    "[aria-label*='error']",
+    "[aria-label*='错误']"
+  ],
+  "errorAction": [
+    "button",
+    "a",
+    "[role='button']"
   ]
 }

@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -33,13 +35,9 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import app.zcode.mobile.model.Artifact
 import app.zcode.mobile.model.ArtifactKind
-import app.zcode.mobile.ui.components.Hairline
+import app.zcode.mobile.ui.components.IconButtonCircle
 import app.zcode.mobile.ui.components.ScreenHeader
-import app.zcode.mobile.ui.theme.Ink
-import app.zcode.mobile.ui.theme.InkRaised
-import app.zcode.mobile.ui.theme.Mute
-import app.zcode.mobile.ui.theme.Paper
-import app.zcode.mobile.ui.theme.Sand
+import app.zcode.mobile.ui.theme.ZTheme
 import java.io.File
 import java.nio.charset.Charset
 
@@ -48,21 +46,22 @@ fun PreviewScreen(
     artifact: Artifact,
     onBack: () -> Unit,
 ) {
+    val c = ZTheme.colors
     val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Ink),
+            .background(c.surface),
     ) {
         ScreenHeader(
             title = artifact.name,
             onBack = onBack,
+            subtitle = artifact.kind.name,
             trailing = {
-                TextButton(onClick = { share(context, artifact) }) { Text("Share", color = Sand) }
-                TextButton(onClick = { openExternal(context, artifact) }) { Text("Open", color = Sand) }
+                IconButtonCircle(Icons.Outlined.Share, contentDescription = "分享", onClick = { share(context, artifact) }, tint = c.fgSecondary)
+                IconButtonCircle(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "用其他应用打开", onClick = { openExternal(context, artifact) }, tint = c.fgSecondary)
             },
         )
-        Hairline()
         when (artifact.kind) {
             ArtifactKind.Image -> {
                 AsyncImage(
@@ -84,12 +83,12 @@ fun PreviewScreen(
                         .fillMaxSize()
                         .horizontalScroll(rememberScrollState())
                         .verticalScroll(rememberScrollState())
-                        .background(InkRaised)
+                        .background(c.surfaceLow)
                         .padding(16.dp),
                 ) {
                     Text(
                         text = text,
-                        color = Paper,
+                        color = c.fg,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 13.sp,
                         lineHeight = 20.sp,
@@ -123,7 +122,7 @@ private fun PdfPreview(artifact: Artifact) {
     val bitmaps = remember(artifact.uri) { renderPdf(context, artifact) }
     DisposableEffect(bitmaps) { onDispose { bitmaps.forEach { it.recycle() } } }
     if (bitmaps.isEmpty()) {
-        Text("无法预览 PDF", color = Mute, modifier = Modifier.padding(24.dp))
+        Text("无法预览 PDF", color = ZTheme.colors.fgSecondary, modifier = Modifier.padding(24.dp))
     } else {
         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
             bitmaps.forEach { bmp ->

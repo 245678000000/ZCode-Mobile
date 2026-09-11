@@ -9,6 +9,8 @@
     var timer = null;
     var lastJson = '';
     var bridge = window.ZCodeAndroidBridge;
+    // Body text is read once per snapshot; innerText forces layout and is expensive.
+    var bodyTextCache = '';
 
     function sanitize(s, max) {
       if (!s) return '';
@@ -21,6 +23,11 @@
         var u = location.origin + location.pathname;
         return sanitize(u, 300);
       } catch (e) { return ''; }
+    }
+    function bodyText() {
+      if (bodyTextCache) return bodyTextCache;
+      bodyTextCache = sanitize((document.body && document.body.innerText) || '', 4000);
+      return bodyTextCache;
     }
     function visible(el) {
       if (!el || !el.getBoundingClientRect) return false;
@@ -44,10 +51,20 @@
       for (i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
       return String(h);
     }
+    function commonAncestor(a, b) {
+      if (!a || !b) return null;
+      var node = a, depth = 0;
+      while (node && depth < 6) {
+        if (node.contains(b)) return node;
+        node = node.parentElement;
+        depth++;
+      }
+      return null;
+    }
     var STATUS_RE = /(等待确认|需要确认|待确认|运行中|正在执行|执行中|已完成|失败|已取消|排队|waiting for confirm|waiting approval|needs confirmation|running|in progress|working|completed|complete|failed|error|cancelled|canceled|queued)/i;
     var ALLOW_RE = /^(allow|approve|confirm|always allow|允许|始终允许|确认)$/i;
     var REJECT_RE = /^(reject|deny|refuse|拒绝|不允许)$/i;
-    var WAIT_RE = /(waiting|permission|authorization|confirm|等待确认|需要确认|需要授权|权限)/i;
+    var WAIT_RE = /(waiting for|waiting approval|needs confirmation|permission|authorization|等待确认|需要确认|需要授权|等待授权)/i;
     var FILE_RE = /\.(md|html|htm|png|jpe?g|webp|gif|pdf|json|kt|java|ts|tsx|js|py|go|rs|sh|txt)(\?|$)/i;
     var EXPIRED_RE = /(session expired|登录过期|会话过期|连接已断开|disconnected|unauthorized)/i;
 
@@ -76,7 +93,8 @@
         var raw = textOf(row);
         var title = titleEl ? textOf(titleEl) : raw.replace(STATUS_RE, '').trim().slice(0, 80);
         var status = statusEl ? statusFrom(textOf(statusEl)) : statusFrom(raw);
-        if (title && (status || title.length > 1)) push(row.getAttribute('data-testid') || hash(title + status), title, status, '', '');
+        // The id must NOT depend on status, otherwise a status change looks like a new task.
+        if (title && (status || title.length > 1)) push(row.getAttribute('data-testid') || hash(title), title, status, '', '');
       });
       if (tasks.length === 0) {
         var headings = qsAll(cfg.taskTitle);
@@ -89,8 +107,7 @@
         });
       }
       if (tasks.length === 0) {
-        var body = sanitize(document.body ? document.body.innerText : '', 4000);
-        var st = statusFrom(body);
+        var st = statusFrom(bodyText());
         var t = (document.title || '').trim();
         if (t) push('current', t, st, '', '');
       }
@@ -118,31 +135,36 @@
         if (!rejectBtn) rejectBtn = { el: b, label: textOf(b) || 'Reject' };
       });
       var dialog = dialogs[0] || null;
-      var dialogText = dialog ? textOf(dialog) : '';
-      var bodyText = sanitize((document.body && document.body.innerText) || '', 2500);
-      var waiting = WAIT_RE.test(dialogText) || WAIT_RE.test(bodyText);
-      var command = '';
-      var pre = dialog ? dialog.querySelector('pre,code,[data-testid*="command"],[data-testid*="tool"]') : document.querySelector('pre,code');
-      if (pre && visible(pre)) command = textOf(pre);
-      if (!command && dialogText) {
-        var cm = dialogText.match(/\b(rm |git |npm |pnpm |sudo |chmod |curl |wget |python |pip )[\s\S]{0,180}/);
-        if (cm) command = cm[0];
-      }
       var hasDialog = !!dialog;
       var hasAllow = !!allowBtn;
       var hasReject = !!rejectBtn;
+      // Gate: an approval needs a dialog, or an allow+reject pair. A lone "确认" button
+      // plus some code block elsewhere on the page is not an approval.
+      if (!hasDialog && !(hasAllow && hasReject)) return null;
+      // Only look inside the approval container, never the whole page.
+      var scope = dialog || commonAncestor(allowBtn.el, rejectBtn.el);
+      if (!scope) return null;
+      var scopeText = textOf(scope);
+      var waiting = WAIT_RE.test(scopeText);
+      var command = '';
+      var pre = scope.querySelector('pre,code,[data-testid*="command"],[data-testid*="tool"]');
+      if (pre && visible(pre)) command = textOf(pre);
+      if (!command && scopeText) {
+        var cm = scopeText.match(/\b(rm |git |npm |pnpm |sudo |chmod |curl |wget |python |pip )[\s\S]{0,180}/);
+        if (cm) command = cm[0];
+      }
       var score = 0;
       if (hasDialog) score++;
-      if (hasAllow && hasReject) score++;
-      else if (hasAllow || hasReject) score++;
+      if (hasAllow || hasReject) score++;
       if (waiting) score++;
       if (command) score++;
       if (score < 2) return null;
-      var title = (dialog && (dialog.querySelector('h1,h2,h3,[data-testid*="title"]'))) ? textOf(dialog.querySelector('h1,h2,h3,[data-testid*="title"]')) : '需要确认';
+      var titleEl = scope.querySelector('h1,h2,h3,[data-testid*="title"]');
+      var title = titleEl ? textOf(titleEl) : '需要确认';
       return {
-        id: hash((command || dialogText || title).slice(0, 80)),
+        id: hash((command || scopeText || title).slice(0, 80)),
         title: title || '需要确认',
-        description: sanitize(dialogText || bodyText.slice(0, 180), 240),
+        description: sanitize(scopeText.slice(0, 180), 240),
         command: sanitize(command, 300),
         hasDialog: hasDialog,
         hasAllow: hasAllow,
@@ -182,34 +204,53 @@
       }).filter(function (m) { return m.text.length > 0 && m.text.length < 400; });
     }
 
-    function connectionHint() {
-      var t = ((document.body && document.body.innerText) || '') + ' ' + (document.title || '');
+    function scanError() {
+      var banner = qsAll(cfg.errorBanner)[0];
+      if (!banner) return '';
+      var text = textOf(banner);
+      // Strip action labels ("重试", "Retry") so the error text is the message only.
+      qsAll(cfg.errorAction).forEach(function (a) {
+        if (banner.contains(a)) {
+          var label = textOf(a);
+          if (label) text = text.replace(label, '');
+        }
+      });
+      return sanitize(text.trim(), 200);
+    }
+
+    function connectionHint(errorText) {
+      var t = bodyText() + ' ' + (document.title || '');
       if (EXPIRED_RE.test(t)) return 'expired';
+      if (errorText) return 'error';
       return 'ok';
     }
 
     function snapshot(reason) {
+      bodyTextCache = '';
       var tasks = scanTasks();
+      var errorText = scanError();
       var sessionTitle = tasks[0] ? tasks[0].title : sanitize(document.title, 80);
       var snap = {
         url: redactedUrl(),
         title: sanitize(document.title, 80),
-        connectionHint: connectionHint(),
+        connectionHint: connectionHint(errorText),
+        errorText: errorText,
         sessionId: hash(redactedUrl() + sessionTitle),
         sessionTitle: sessionTitle,
         tasks: tasks,
         approval: scanApproval(),
         artifacts: scanArtifacts(),
         messages: scanMessages(),
-        observerActive: true,
-        timestamp: Date.now(),
-        reason: reason || 'mutation'
+        observerActive: true
       };
+      // Compare content only; timestamp/reason must not defeat the dedupe.
       var json = JSON.stringify(snap);
       if (json === lastJson) return;
       lastJson = json;
+      snap.timestamp = Date.now();
+      snap.reason = reason || 'mutation';
       if (bridge && bridge.onPageState) {
-        try { bridge.onPageState(json); } catch (e) {}
+        try { bridge.onPageState(JSON.stringify(snap)); } catch (e) {}
       }
     }
 
@@ -230,11 +271,6 @@
         ps.apply(this, arguments);
         schedule('pushState');
       };
-    } catch (e) {}
-    try {
-      if (window.Notification && Notification.prototype) {
-        /* observe only that the page posted a notification; do not read secrets */
-      }
     } catch (e) {}
     snapshot('install');
     return 'ok';

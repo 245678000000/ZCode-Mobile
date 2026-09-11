@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome status-bar glyph, same "Z" as the launcher icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -6,8 +7,11 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M4,4h16v2.2H10.6L20,18.8h-3.2L7.6,8.6H4V4z" />
+        android:pathData="M2.5,3.5 H12.5 L10.8,5.9 H2.5 Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M4,17.8h10V20H4z" />
+        android:pathData="M14.1,3.5 H22 L9.9,20.5 H2 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21.5,18.1 V20.5 H11.5 L13.2,18.1 Z" />
 </vector>

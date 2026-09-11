@@ -3,7 +3,7 @@ package app.zcode.mobile.ui.remote
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,13 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -45,12 +42,11 @@ import app.zcode.mobile.remote.ZCodeDomObserver
 import app.zcode.mobile.remote.ZCodeWebBridge
 import app.zcode.mobile.remote.ZCodeWebView
 import app.zcode.mobile.ui.components.ErrorPanel
+import app.zcode.mobile.ui.components.IconButtonCircle
 import app.zcode.mobile.ui.components.Hairline
-import app.zcode.mobile.ui.components.StatusDot
-import app.zcode.mobile.ui.theme.Ink
-import app.zcode.mobile.ui.theme.Mute
-import app.zcode.mobile.ui.theme.Paper
-import app.zcode.mobile.ui.theme.Sage
+import app.zcode.mobile.ui.components.StatusText
+import app.zcode.mobile.ui.theme.ZTheme
+import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun RemoteScreen(
@@ -71,6 +67,7 @@ fun RemoteScreen(
     onDisconnect: () -> Unit,
     onReconnect: () -> Unit,
 ) {
+    val c = ZTheme.colors
     var pageState by remember { mutableStateOf<RemotePageState>(RemotePageState.Idle) }
     var menu by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -101,69 +98,60 @@ fun RemoteScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Ink),
+            .background(c.surface),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
-                .padding(horizontal = 4.dp),
+                .height(56.dp)
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .clickable {
-                        val view = webView
-                        if (view != null && view.canGoBack()) view.goBack() else onBackToHome()
+            IconButtonCircle(
+                icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = "返回",
+                tint = c.fgSecondary,
+                onClick = {
+                    val view = webView
+                    if (view != null && view.canGoBack()) view.goBack() else onBackToHome()
+                },
+            )
+            Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
+                Text("ZCode", color = c.fg, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                StatusText(
+                    text = when (pageState) {
+                        is RemotePageState.Ready -> "已连接"
+                        is RemotePageState.Error -> "连接失败"
+                        else -> "连接中…"
                     },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("←", color = Paper, fontSize = 20.sp)
-            }
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("ZCode", color = Paper, fontSize = 15.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        StatusDot(connected = pageState is RemotePageState.Ready)
-                        Text(
-                            text = if (pageState is RemotePageState.Ready) "  Connected" else "  Connecting",
-                            color = if (pageState is RemotePageState.Ready) Sage else Mute,
-                            fontSize = 11.sp,
-                        )
-                    }
-                }
+                    color = when (pageState) {
+                        is RemotePageState.Ready -> c.success
+                        is RemotePageState.Error -> c.danger
+                        else -> c.fgTertiary
+                    },
+                )
             }
             Box {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .clickable { menu = true },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Outlined.MoreVert, contentDescription = "菜单", tint = Paper)
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Refresh") }, onClick = {
+                IconButtonCircle(icon = Icons.Outlined.MoreVert, contentDescription = "菜单", onClick = { menu = true }, tint = c.fgSecondary)
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = c.surface) {
+                    DropdownMenuItem(text = { Text("刷新", color = c.fg) }, onClick = {
                         menu = false
                         webView?.reload()
                     })
-                    DropdownMenuItem(text = { Text("Reconnect") }, onClick = {
+                    DropdownMenuItem(text = { Text("重新连接", color = c.fg) }, onClick = {
                         menu = false
                         reloadToken++
                         onReconnect()
                     })
-                    DropdownMenuItem(text = { Text("Open in Browser") }, onClick = {
+                    DropdownMenuItem(text = { Text("在浏览器中打开", color = c.fg) }, onClick = {
                         menu = false
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(remoteUrl)))
                     })
-                    DropdownMenuItem(text = { Text("Copy Remote URL") }, onClick = {
+                    DropdownMenuItem(text = { Text("复制 Remote 链接", color = c.fg) }, onClick = {
                         menu = false
                         clipboard.setText(AnnotatedString(remoteUrl))
                     })
-                    DropdownMenuItem(text = { Text("Disconnect") }, onClick = {
+                    DropdownMenuItem(text = { Text("断开连接", color = c.danger) }, onClick = {
                         menu = false
                         onDisconnect()
                     })
@@ -198,7 +186,7 @@ fun RemoteScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Ink),
+                        .background(c.surface),
                 ) {
                     ErrorPanel(
                         title = "无法连接 ZCode",
@@ -212,7 +200,7 @@ fun RemoteScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Ink),
+                        .background(c.surface),
                 ) {
                     ErrorPanel(
                         title = "无法连接 ZCode",
@@ -240,6 +228,7 @@ private fun reasonsFor(kind: RemoteErrorKind): List<String> = when (kind) {
     RemoteErrorKind.Ssl -> listOf("证书不受信任", "Remote Session 已过期")
     RemoteErrorKind.Http404 -> listOf("Remote Control 已关闭", "Remote Session 已过期", "Remote URL 失效")
     RemoteErrorKind.Http500 -> listOf("电脑端 ZCode 异常", "Remote Control 已关闭")
+    RemoteErrorKind.SessionExpired -> listOf("Remote Session 已过期", "请在电脑上重新生成 Remote 二维码")
     RemoteErrorKind.Timeout -> listOf("电脑未启动 ZCode", "网络连接异常")
     RemoteErrorKind.Generic -> listOf(
         "电脑未启动 ZCode",

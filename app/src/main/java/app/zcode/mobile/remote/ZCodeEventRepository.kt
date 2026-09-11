@@ -53,9 +53,14 @@ class ZCodeEventRepository(
     private var lastConnectionEventAt: Long = 0L
 
     val activeTask: Task?
-        get() = sortedTasks().firstOrNull {
+        get() = activeTask(_tasks.value)
+
+    fun activeTask(list: List<Task>): Task? {
+        val sorted = sortedTasks(list)
+        return sorted.firstOrNull {
             it.status == TaskStatus.WAITING_APPROVAL || it.status == TaskStatus.RUNNING
-        } ?: sortedTasks().firstOrNull()
+        } ?: sorted.firstOrNull()
+    }
 
     fun ingestEvent(event: ZCodeEvent): Boolean {
         val key = event.dedupeKey()
@@ -111,7 +116,8 @@ class ZCodeEventRepository(
 
     fun approvalById(id: String): ApprovalRequest? = _approvals.value.find { it.id == id }
 
-    fun sortedTasks(): List<Task> {
+    /** Pure sort so Compose can `remember(tasks)` it instead of re-reading the flow. */
+    fun sortedTasks(list: List<Task> = _tasks.value): List<Task> {
         val rank = mapOf(
             TaskStatus.WAITING_APPROVAL to 0,
             TaskStatus.RUNNING to 1,
@@ -121,7 +127,7 @@ class ZCodeEventRepository(
             TaskStatus.COMPLETED to 5,
             TaskStatus.CANCELLED to 6,
         )
-        return _tasks.value.sortedWith(
+        return list.sortedWith(
             compareBy<Task> { rank[it.status] ?: 9 }.thenByDescending { it.updatedAt },
         )
     }
@@ -197,7 +203,6 @@ class ZCodeEventRepository(
                     source = "dom",
                     timestamp = event.timestamp,
                     taskId = event.taskId,
-                    canActSafely = false,
                 )
                 _approvals.value = listOf(request) + _approvals.value.filterNot { it.id == request.id }
                 event.taskId?.let { id ->

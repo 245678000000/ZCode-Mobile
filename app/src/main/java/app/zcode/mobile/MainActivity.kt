@@ -1,7 +1,12 @@
 package app.zcode.mobile
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -10,19 +15,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import app.zcode.mobile.model.Artifact
+import app.zcode.mobile.model.MessageReceived
+import app.zcode.mobile.model.relatedTaskId
 import app.zcode.mobile.navigation.Routes
 import app.zcode.mobile.notification.TaskNotificationManager
 import app.zcode.mobile.remote.RemoteWebConfig
@@ -37,8 +47,8 @@ import app.zcode.mobile.ui.remote.RemoteScreen
 import app.zcode.mobile.ui.settings.SettingsScreen
 import app.zcode.mobile.ui.splash.SplashScreen
 import app.zcode.mobile.ui.task.TaskDetailScreen
-import app.zcode.mobile.ui.theme.Ink
 import app.zcode.mobile.ui.theme.ZCodeTheme
+import app.zcode.mobile.ui.theme.ZTheme
 import app.zcode.mobile.ui.voice.VoiceScreen
 import app.zcode.mobile.util.RemoteUrl
 
@@ -47,11 +57,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        runCatching { enableEdgeToEdge() }
         consumeIntent(intent)
         setContent {
             ZCodeTheme {
+                val darkTheme = ZTheme.colors.isDark
+                LaunchedEffect(darkTheme) {
+                    runCatching {
+                        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !darkTheme
+                    }
+                }
                 val nav = rememberNavController()
                 val device by appViewModel.device.collectAsStateWithLifecycle()
                 val settings by appViewModel.settings.collectAsStateWithLifecycle()
@@ -105,7 +120,7 @@ class MainActivity : ComponentActivity() {
                     startDestination = Routes.Splash,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Ink)
+                        .background(ZTheme.colors.surface)
                         .systemBarsPadding(),
                 ) {
                     composable(Routes.Splash) {
@@ -147,11 +162,17 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable(Routes.Home) {
+                        NotificationPermissionRequest(enabled = settings.taskNotifications || settings.approvalNotifications)
+                        val sortedTasks = remember(tasks) { appViewModel.events.sortedTasks(tasks) }
                         HomeScreen(
                             device = device,
                             connection = connection,
-                            tasks = appViewModel.events.sortedTasks(),
+                            tasks = sortedTasks,
                             onOpenRemote = { nav.navigate(Routes.Remote) },
+                            onSend = { text ->
+                                appViewModel.queueInject(text)
+                                nav.navigate(Routes.Remote) { launchSingleTop = true }
+                            },
                             onTask = { task ->
                                 selectedTaskId = task.id
                                 nav.navigate(Routes.TaskDetail)
@@ -172,6 +193,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onChangeDevice = { nav.navigate(Routes.Connect) },
                             onSettings = { nav.navigate(Routes.Settings) },
+                            voiceEnabled = settings.voiceEnabled,
                             observerSlot = {
                                 val url = device?.remoteUrl
                                 if (!url.isNullOrBlank()) {
@@ -259,16 +281,20 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     composable(Routes.TaskDetail) {
-                        val task = selectedTaskId?.let { appViewModel.events.taskById(it) }
-                            ?: appViewModel.events.activeTask
+                        val task = selectedTaskId?.let { id -> tasks.find { it.id == id } }
+                            ?: appViewModel.events.activeTask(tasks)
                         if (task == null) {
                             LaunchedEffect(Unit) { nav.popBackStack() }
                         } else {
+                            val taskEvents = remember(events, task.id) {
+                                events.filter { ev ->
+                                    val related = ev.relatedTaskId()
+                                    related == task.id || (related == null && ev is MessageReceived)
+                                }
+                            }
                             TaskDetailScreen(
                                 task = task,
-                                events = events.filter { ev ->
-                                    ev.toString().contains(task.id) || ev.type.contains("Task") || ev.type.contains("Message")
-                                },
+                                events = taskEvents,
                                 artifacts = artifacts.filter { it.taskId == null || it.taskId == task.id },
                                 approval = approvals.firstOrNull { it.taskId == task.id } ?: approvals.firstOrNull(),
                                 onBack = { nav.popBackStack() },
@@ -290,18 +316,6 @@ class MainActivity : ComponentActivity() {
                             request = appViewModel.lastApproval,
                             onBack = { nav.popBackStack() },
                             onOpenRemote = { nav.navigate(Routes.Remote) },
-                            onAllow = {
-                                appViewModel.tryNativeApproval(true) { ok, _ ->
-                                    if (!ok) nav.navigate(Routes.Remote)
-                                    else nav.popBackStack()
-                                }
-                            },
-                            onDeny = {
-                                appViewModel.tryNativeApproval(false) { ok, _ ->
-                                    if (!ok) nav.navigate(Routes.Remote)
-                                    else nav.popBackStack()
-                                }
-                            },
                         )
                     }
                     composable(Routes.Developer) {
@@ -377,5 +391,23 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         appViewModel.sessionManager.persist()
+    }
+}
+
+/**
+ * Android 13+ needs the runtime POST_NOTIFICATIONS permission before any notification is
+ * shown. Ask once, when the user first lands on Home with notifications enabled.
+ */
+@Composable
+private fun NotificationPermissionRequest(enabled: Boolean) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !enabled) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

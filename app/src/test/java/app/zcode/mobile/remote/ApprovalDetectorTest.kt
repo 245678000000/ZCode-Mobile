@@ -48,6 +48,24 @@ class ApprovalDetectorTest {
     }
 
     @Test
+    fun codeBlockPlusLoneConfirmButtonIsNotApproval() {
+        // A chat page with a code block and a single "确认" button somewhere must not count.
+        val noisy = SnapshotApproval(
+            id = "1",
+            title = "x",
+            description = "",
+            command = "npm install",
+            hasDialog = false,
+            hasAllow = true,
+            hasReject = false,
+            waitingContext = false,
+        )
+        assertFalse(ApprovalDetector.isApproval(noisy))
+        assertTrue(ApprovalDetector.isApproval(noisy.copy(hasReject = true)))
+        assertTrue(ApprovalDetector.isApproval(noisy.copy(hasDialog = true)))
+    }
+
+    @Test
     fun riskRules() {
         assertEquals(RiskLevel.HIGH, ApprovalDetector.riskLevel("rm -rf legacy/", "删除文件"))
         assertEquals(RiskLevel.MEDIUM, ApprovalDetector.riskLevel("npm test", "执行命令"))

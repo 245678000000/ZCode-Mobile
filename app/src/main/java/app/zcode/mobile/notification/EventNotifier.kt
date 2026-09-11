@@ -12,9 +12,16 @@ class EventNotifier(
     private val manager: TaskNotificationManager,
     private val settings: () -> AppSettings,
 ) {
-    private val completed = mutableSetOf<String>()
-    private val failed = mutableSetOf<String>()
-    private val approvals = mutableSetOf<String>()
+    private val completed = BoundedSet()
+    private val failed = BoundedSet()
+    private val approvals = BoundedSet()
+
+    /** Forget what was already notified, e.g. after disconnect / clear. */
+    fun reset() {
+        completed.clear()
+        failed.clear()
+        approvals.clear()
+    }
 
     fun onEvent(event: ZCodeEvent) {
         val s = settings()
@@ -62,4 +69,17 @@ class EventNotifier(
             else -> Unit
         }
     }
+}
+
+/** Insertion-ordered set capped at [max]; oldest entries are evicted. */
+private class BoundedSet(private val max: Int = 500) {
+    private val items = LinkedHashSet<String>()
+
+    fun add(value: String): Boolean {
+        if (!items.add(value)) return false
+        while (items.size > max) items.remove(items.first())
+        return true
+    }
+
+    fun clear() = items.clear()
 }

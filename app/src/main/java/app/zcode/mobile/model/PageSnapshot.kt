@@ -37,6 +37,7 @@ data class PageSnapshot(
     val url: String = "",
     val title: String = "",
     val connectionHint: String? = null,
+    val errorText: String? = null,
     val sessionId: String? = null,
     val sessionTitle: String? = null,
     val tasks: List<SnapshotTask> = emptyList(),

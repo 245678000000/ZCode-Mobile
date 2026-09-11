@@ -6,8 +6,8 @@ import app.zcode.mobile.model.SnapshotArtifact
 import app.zcode.mobile.model.SnapshotTask
 
 /**
- * Pure-ish HTML fixture parser for tests. Not used as the live production parser.
- * Live extraction happens in the injected MutationObserver.
+ * Regex-based HTML fixture parser used only by unit tests. Live extraction happens in
+ * the injected MutationObserver (assets/zcode-observer.js); this is a test-side stand-in.
  */
 object HtmlSnapshotExtractor {
     private val TAG_RE = Regex("<[^>]+>")

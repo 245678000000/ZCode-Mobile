@@ -14,6 +14,11 @@ object RemoteUrl {
 
     fun isValid(input: String): Boolean = parse(input) != null
 
+    /**
+     * Accepts https to any host, and plain http only to LAN / loopback / CGNAT (Tailscale)
+     * hosts. A Remote URL carries the session secret in its path; sending that in clear
+     * text across the public internet is never acceptable.
+     */
     fun parse(input: String): RemoteUrlParse? {
         val raw = normalize(input)
         if (raw.isEmpty()) return null
@@ -23,9 +28,22 @@ object RemoteUrl {
             if (scheme != "http" && scheme != "https") return null
             val host = uri.host?.lowercase() ?: return null
             if (host.isBlank()) return null
+            if (scheme == "http" && !isPrivateHost(host)) return null
             RemoteUrlParse(raw = raw, scheme = scheme, host = host, isHttps = scheme == "https")
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /** True when the input is a URL but was rejected only because it is http to a public host. */
+    fun isPublicHttp(input: String): Boolean {
+        val raw = normalize(input)
+        return try {
+            val uri = URI(raw)
+            val host = uri.host?.lowercase() ?: return false
+            uri.scheme?.lowercase() == "http" && !isPrivateHost(host)
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -103,6 +121,8 @@ object RemoteUrl {
             return a == 10 ||
                 (a == 192 && b == 168) ||
                 (a == 172 && b in 16..31) ||
+                (a == 100 && b in 64..127) || // CGNAT, used by Tailscale
+                (a == 169 && b == 254) || // link-local
                 a == 127
         }
         return false

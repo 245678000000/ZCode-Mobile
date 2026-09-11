@@ -18,7 +18,6 @@ data class ApprovalRequest(
     val taskId: String? = null,
     val allowLabel: String? = null,
     val rejectLabel: String? = null,
-    val canActSafely: Boolean = false,
 ) {
     companion object {
         fun demo(): ApprovalRequest = ApprovalRequest(
@@ -28,7 +27,6 @@ data class ApprovalRequest(
             command = "rm -rf legacy/",
             riskLevel = RiskLevel.HIGH,
             source = "developer-demo",
-            canActSafely = false,
         )
     }
 }

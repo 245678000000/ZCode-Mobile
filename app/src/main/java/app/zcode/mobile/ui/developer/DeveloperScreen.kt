@@ -20,14 +20,13 @@ import app.zcode.mobile.model.Artifact
 import app.zcode.mobile.model.ConnectionState
 import app.zcode.mobile.model.Task
 import app.zcode.mobile.model.ZCodeEvent
-import app.zcode.mobile.ui.components.GhostButton
+import app.zcode.mobile.ui.components.CodeBlock
+import app.zcode.mobile.ui.components.SecondaryButton
+import app.zcode.mobile.ui.components.PageInset
 import app.zcode.mobile.ui.components.PrimaryButton
-import app.zcode.mobile.ui.components.QuietCard
 import app.zcode.mobile.ui.components.ScreenHeader
-import app.zcode.mobile.ui.components.SectionLabel
-import app.zcode.mobile.ui.theme.Ink
-import app.zcode.mobile.ui.theme.Mute
-import app.zcode.mobile.ui.theme.Paper
+import app.zcode.mobile.ui.components.GroupLabel
+import app.zcode.mobile.ui.theme.ZTheme
 
 @Composable
 fun DeveloperScreen(
@@ -42,49 +41,50 @@ fun DeveloperScreen(
     onBack: () -> Unit,
     onInjectFixture: () -> Unit,
 ) {
+    val c = ZTheme.colors
     val clipboard = LocalClipboardManager.current
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Ink),
+            .background(c.surface),
     ) {
         ScreenHeader(title = "Developer", onBack = onBack)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+                .padding(horizontal = PageInset, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            QuietCard {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("URL  $url", color = Paper, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
-                    Text("Connection  $connection", color = Mute, fontSize = 13.sp)
-                    Text("Observer  ${if (observerActive) "active" else "idle"}", color = Mute, fontSize = 13.sp)
-                    Text("Bridge  ZCodeAndroidBridge", color = Mute, fontSize = 13.sp)
-                }
-            }
-            SectionLabel("Tasks ${tasks.size}")
+            CodeBlock(
+                text = buildString {
+                    appendLine("url        $url")
+                    appendLine("connection $connection")
+                    appendLine("observer   ${if (observerActive) "active" else "idle"}")
+                    append("bridge     ZCodeAndroidBridge")
+                },
+            )
+            GroupLabel("Tasks ${tasks.size}")
             tasks.take(12).forEach {
-                Text("${it.status}  ${it.title}", color = Paper, fontSize = 13.sp)
+                Text("${it.status}  ${it.title}", color = c.fg, fontSize = 13.sp)
             }
-            SectionLabel("Approvals ${approvals.size}")
+            GroupLabel("Approvals ${approvals.size}")
             approvals.take(8).forEach {
-                Text("${it.riskLevel}  ${it.title}", color = Paper, fontSize = 13.sp)
+                Text("${it.riskLevel}  ${it.title}", color = c.fg, fontSize = 13.sp)
             }
-            SectionLabel("Artifacts ${artifacts.size}")
+            GroupLabel("Artifacts ${artifacts.size}")
             artifacts.take(8).forEach {
-                Text(it.name, color = Paper, fontSize = 13.sp)
+                Text(it.name, color = c.fg, fontSize = 13.sp)
             }
-            SectionLabel("Events ${events.size}")
+            GroupLabel("Events ${events.size}")
             events.take(50).forEach {
-                Text("${it.type}  ${it.timestamp}", color = Mute, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                Text("${it.type}  ${it.timestamp}", color = c.fgSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
             PrimaryButton(text = "Copy sanitized debug info", onClick = {
                 clipboard.setText(AnnotatedString(dump))
             })
-            GhostButton(text = "Inject developer fixture", onClick = onInjectFixture)
-            Text("Fixture 只在 Developer Mode 下可用，不会进入默认生产 UI。", color = Mute, fontSize = 12.sp)
+            SecondaryButton(text = "Inject developer fixture", onClick = onInjectFixture)
+            Text("Fixture 只在 Developer Mode 下可用，不会进入默认生产 UI。", color = c.fgSecondary, fontSize = 12.sp)
         }
     }
 }

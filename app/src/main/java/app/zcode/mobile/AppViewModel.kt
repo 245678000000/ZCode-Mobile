@@ -3,6 +3,7 @@ package app.zcode.mobile
 import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
+import android.content.MutableContextWrapper
 import android.net.Uri
 import android.os.Environment
 import android.view.ViewGroup
@@ -26,6 +27,7 @@ import app.zcode.mobile.remote.ZCodeEventRepository
 import app.zcode.mobile.remote.ZCodeRemoteManager
 import app.zcode.mobile.remote.ZCodeWebBridge
 import app.zcode.mobile.security.SecureStorage
+import app.zcode.mobile.util.AppLog
 import app.zcode.mobile.util.NetworkMonitor
 import app.zcode.mobile.util.RemoteUrl
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,15 +100,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var webView: WebView? = null
         private set
 
-    fun ensureWebView(context: Context): WebView {
+    /**
+     * The WebView outlives the Activity, so it is created on a [MutableContextWrapper]
+     * around the application context. [ZCodeWebView] swaps the base context to the
+     * hosting Activity while attached (JS dialogs / file choosers need a window) and back
+     * to the application context on release, so no Activity is ever retained here.
+     */
+    fun ensureWebView(context: Context): WebView? {
         val existing = webView
         if (existing != null) {
             (existing.parent as? ViewGroup)?.removeView(existing)
             return existing
         }
-        val created = WebView(context.applicationContext)
-        webView = created
-        return created
+        return runCatching { WebView(MutableContextWrapper(context.applicationContext)) }
+            .onFailure { AppLog.e("AppViewModel", "WebView create failed", it) }
+            .getOrNull()
+            ?.also { webView = it }
+    }
+
+    override fun onCleared() {
+        runCatching { webView?.destroy() }
+        webView = null
+        super.onCleared()
     }
 
     fun saveConnection(url: String): Boolean {
@@ -122,7 +137,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             webView = null
         }
         remoteManager.disconnect(clearWeb)
-        events.clear()
+        clearEvents()
     }
 
     fun clearWebViewData() {
@@ -130,7 +145,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         webView?.clearCache(true)
         webView?.clearHistory()
         webView?.clearFormData()
+        clearEvents()
+    }
+
+    private fun clearEvents() {
         events.clear()
+        eventNotifier.reset()
     }
 
     fun queueInject(text: String) {
@@ -239,18 +259,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         ZCodeEventParserSafe.ingest(events, json)
     }
 
-    fun tryNativeApproval(allow: Boolean, onDone: (Boolean, String) -> Unit) {
-        val wv = webView
-        val approval = lastApproval
-        if (wv == null || !approval.canActSafely) {
-            onDone(false, "open-remote")
-            return
-        }
-        observer.clickApproval(wv, approval.id, allow, approval.command) { result ->
-            val ok = result == "clicked"
-            onDone(ok, result)
-        }
-    }
 }
 
 private object ZCodeEventParserSafe {

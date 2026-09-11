@@ -22,13 +22,18 @@ data class ApprovalSignals(
             return n
         }
 
-    val isApproval: Boolean get() = score >= 2
+    /**
+     * A dialog, or an allow+reject button pair, is required. Without that gate a lone
+     * "确认" button plus any code block on the page would count as an approval.
+     */
+    val isApproval: Boolean
+        get() = (hasDialogOrModal || (hasAllowButton && hasRejectButton)) && score >= 2
 }
 
 object ApprovalDetector {
     private val ALLOW = listOf("allow", "approve", "confirm", "always allow", "允许", "始终允许", "确认", "继续")
     private val REJECT = listOf("reject", "deny", "refuse", "拒绝", "不允许")
-    private val WAITING = listOf("waiting", "confirm", "permission", "authorization", "等待确认", "需要确认", "需要授权", "权限")
+    private val WAITING = listOf("waiting for", "waiting approval", "needs confirmation", "permission", "authorization", "等待确认", "需要确认", "需要授权", "等待授权")
 
     fun signals(approval: SnapshotApproval?): ApprovalSignals {
         if (approval == null) return ApprovalSignals()

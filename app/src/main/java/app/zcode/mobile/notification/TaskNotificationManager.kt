@@ -82,7 +82,12 @@ class TaskNotificationManager(context: Context) {
             .setContentIntent(pending)
             .setPriority(if (high) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        runCatching { manager.notify(id, notification) }
+        if (!manager.areNotificationsEnabled()) return
+        try {
+            manager.notify(id, notification)
+        } catch (_: SecurityException) {
+            // POST_NOTIFICATIONS was revoked between the check and the call.
+        }
     }
 
     private fun ensureChannel() {
@@ -102,7 +107,6 @@ class TaskNotificationManager(context: Context) {
     companion object {
         const val CHANNEL_ID = "zcode_tasks"
         const val CHANNEL_NAME = "ZCode Tasks"
-        const val EXTRA_OPEN_REMOTE = "open_remote"
         const val EXTRA_OPEN_APPROVAL = "open_approval"
         const val EXTRA_APPROVAL_ID = "approval_id"
         const val EXTRA_OPEN_TASK_ID = "open_task_id"

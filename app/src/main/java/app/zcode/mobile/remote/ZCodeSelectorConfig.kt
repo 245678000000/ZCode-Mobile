@@ -14,6 +14,8 @@ data class ZCodeSelectorConfig(
     val approvalRejectButton: List<String>,
     val artifact: List<String>,
     val agentMessage: List<String>,
+    val errorBanner: List<String> = emptyList(),
+    val errorAction: List<String> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("debounceMs", debounceMs)
@@ -25,6 +27,8 @@ data class ZCodeSelectorConfig(
         put("approvalRejectButton", approvalRejectButton.toJsonArray())
         put("artifact", artifact.toJsonArray())
         put("agentMessage", agentMessage.toJsonArray())
+        put("errorBanner", errorBanner.toJsonArray())
+        put("errorAction", errorAction.toJsonArray())
     }
 
     private fun List<String>.toJsonArray(): JSONArray {
@@ -57,6 +61,8 @@ data class ZCodeSelectorConfig(
                 approvalRejectButton = arr("approvalRejectButton"),
                 artifact = arr("artifact"),
                 agentMessage = arr("agentMessage"),
+                errorBanner = arr("errorBanner"),
+                errorAction = arr("errorAction"),
             )
         }
     }

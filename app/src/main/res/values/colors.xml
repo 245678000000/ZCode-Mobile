@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="zcode_ink">#FF0F1114</color>
-    <color name="zcode_sand">#FFC8B89A</color>
-    <color name="ic_launcher_background">#FF0F1114</color>
+    <color name="zcode_window">#FFFFFFFF</color>
+    <color name="zcode_fg">#FF1A1A1A</color>
+    <color name="ic_launcher_background">#FF111111</color>
 </resources>

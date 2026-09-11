@@ -100,23 +100,6 @@ data class ApprovalResolved(
     override fun dedupeKey(): String = "$type:$approvalId:${accepted ?: "gone"}"
 }
 
-data class ApprovalExpired(
-    val approvalId: String,
-    override val timestamp: Long = now(),
-) : ZCodeEvent {
-    override val type: String = "ApprovalExpired"
-    override fun dedupeKey(): String = "$type:$approvalId"
-}
-
-data class ApprovalMismatch(
-    val approvalId: String,
-    val reason: String,
-    override val timestamp: Long = now(),
-) : ZCodeEvent {
-    override val type: String = "ApprovalMismatch"
-    override fun dedupeKey(): String = "$type:$approvalId:$reason"
-}
-
 data class ArtifactCreated(
     val artifactId: String,
     val name: String,
@@ -144,14 +127,14 @@ data class ConnectionLost(
     override val timestamp: Long = now(),
 ) : ZCodeEvent {
     override val type: String = "ConnectionLost"
-    override fun dedupeKey(): String = type
+    override fun dedupeKey(): String = "$type:${reason.orEmpty()}:$timestamp"
 }
 
 data class ConnectionRestored(
     override val timestamp: Long = now(),
 ) : ZCodeEvent {
     override val type: String = "ConnectionRestored"
-    override fun dedupeKey(): String = type
+    override fun dedupeKey(): String = "$type:$timestamp"
 }
 
 data class ObserverUnknown(
@@ -163,3 +146,17 @@ data class ObserverUnknown(
 }
 
 internal fun now(): Long = System.currentTimeMillis()
+
+/** The task this event belongs to, or null for session/connection-level events. */
+fun ZCodeEvent.relatedTaskId(): String? = when (this) {
+    is TaskCreated -> taskId
+    is TaskUpdated -> taskId
+    is TaskRunning -> taskId
+    is TaskWaiting -> taskId
+    is TaskCompleted -> taskId
+    is TaskFailed -> taskId
+    is ApprovalRequired -> taskId
+    is ArtifactCreated -> taskId
+    is MessageReceived -> taskId
+    else -> null
+}

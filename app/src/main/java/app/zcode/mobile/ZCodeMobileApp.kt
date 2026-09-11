@@ -1,22 +1,32 @@
 package app.zcode.mobile
 
 import android.app.Application
+import android.os.Build
+import android.webkit.WebView
 import app.zcode.mobile.notification.TaskNotificationManager
-import app.zcode.mobile.work.TaskStatusWorker
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import java.util.concurrent.TimeUnit
+import app.zcode.mobile.util.AppLog
+import app.zcode.mobile.util.CrashFileLog
 
 class ZCodeMobileApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        TaskNotificationManager(this)
-        val work = PeriodicWorkRequestBuilder<TaskStatusWorker>(6, TimeUnit.HOURS).build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            TaskStatusWorker.UNIQUE_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            work,
-        )
+        CrashFileLog.install(this)
+        prepareWebViewDirectory()
+        runCatching { TaskNotificationManager(this) }
+            .onFailure { AppLog.e(TAG, "notification init failed", it) }
+    }
+
+    private fun prepareWebViewDirectory() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        val process = getProcessName()
+        if (process != packageName) {
+            val suffix = process.substringAfter(':', process).ifBlank { "bg" }
+            runCatching { WebView.setDataDirectorySuffix(suffix) }
+                .onFailure { AppLog.e(TAG, "webview data dir failed", it) }
+        }
+    }
+
+    companion object {
+        private const val TAG = "ZCodeMobileApp"
     }
 }
