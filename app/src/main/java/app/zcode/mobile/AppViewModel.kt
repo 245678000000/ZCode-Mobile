@@ -22,6 +22,7 @@ import app.zcode.mobile.model.TaskCompleted
 import app.zcode.mobile.notification.EventNotifier
 import app.zcode.mobile.notification.TaskNotificationManager
 import app.zcode.mobile.remote.SessionManager
+import app.zcode.mobile.remote.RemotePageState
 import app.zcode.mobile.remote.ZCodeDomObserver
 import app.zcode.mobile.remote.ZCodeEventRepository
 import app.zcode.mobile.remote.ZCodeRemoteManager
@@ -82,6 +83,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         networkMonitor.isOnline(),
     )
 
+    /**
+     * Load state of the shared WebView. It lives here, not in RemoteScreen, because the
+     * same WebView is mounted hidden on Home; the page usually finishes loading there,
+     * and a screen-local state would never see that onPageFinished.
+     */
+    private val _pageState = MutableStateFlow<RemotePageState>(RemotePageState.Idle)
+    val pageState: StateFlow<RemotePageState> = _pageState.asStateFlow()
+
+    fun updatePageState(state: RemotePageState) {
+        _pageState.value = state
+    }
+
     private val _pendingInject = MutableStateFlow<String?>(null)
     val pendingInject: StateFlow<String?> = _pendingInject.asStateFlow()
 
@@ -132,6 +145,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun disconnect(clearWeb: Boolean = false) {
         webView?.stopLoading()
+        _pageState.value = RemotePageState.Idle
         if (clearWeb) {
             webView?.destroy()
             webView = null

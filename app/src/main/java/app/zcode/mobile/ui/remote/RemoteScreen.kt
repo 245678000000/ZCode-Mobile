@@ -19,6 +19,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +60,8 @@ fun RemoteScreen(
     bridge: ZCodeWebBridge,
     observer: ZCodeDomObserver,
     retainedWebView: WebView?,
+    pageState: RemotePageState,
+    onPageState: (RemotePageState) -> Unit,
     pendingInject: String?,
     onConsumeInject: () -> String?,
     onConnected: (Boolean) -> Unit,
@@ -68,7 +73,6 @@ fun RemoteScreen(
     onReconnect: () -> Unit,
 ) {
     val c = ZTheme.colors
-    var pageState by remember { mutableStateOf<RemotePageState>(RemotePageState.Idle) }
     var menu by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var reloadToken by remember { mutableStateOf(0) }
@@ -79,10 +83,17 @@ fun RemoteScreen(
         onConnected(pageState is RemotePageState.Ready)
     }
 
+    // The Remote page is a SPA; its composer may render after onPageFinished, so retry.
     LaunchedEffect(pageState, pendingInject, webView) {
-        if (pageState is RemotePageState.Ready && pendingInject != null && webView != null) {
-            val text = onConsumeInject() ?: return@LaunchedEffect
-            bridge.fillComposer(webView!!, text) { }
+        val view = webView ?: return@LaunchedEffect
+        if (pageState !is RemotePageState.Ready || pendingInject == null) return@LaunchedEffect
+        val text = onConsumeInject() ?: return@LaunchedEffect
+        repeat(12) { attempt ->
+            val result = suspendCancellableCoroutine<ZCodeWebBridge.BridgeResult> { cont ->
+                bridge.fillComposer(view, text) { if (cont.isActive) cont.resume(it) }
+            }
+            if (result == ZCodeWebBridge.BridgeResult.Filled) return@LaunchedEffect
+            delay(if (attempt < 4) 400L else 1000L)
         }
     }
 
@@ -173,7 +184,7 @@ fun RemoteScreen(
                     modifier = Modifier.fillMaxSize(),
                     observer = observer,
                     retainedWebView = retainedWebView,
-                    onState = { pageState = it },
+                    onState = onPageState,
                     onDownload = onDownload,
                     onConnection = onConnection,
                     webViewRef = {
@@ -196,7 +207,7 @@ fun RemoteScreen(
                     )
                 }
             } else if (pageState is RemotePageState.Error) {
-                val error = pageState as RemotePageState.Error
+                val error = pageState
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -206,7 +217,7 @@ fun RemoteScreen(
                         title = "无法连接 ZCode",
                         reasons = reasonsFor(error.kind),
                         primary = "重试" to {
-                            pageState = RemotePageState.Loading
+                            onPageState(RemotePageState.Loading)
                             webView?.reload()
                         },
                         secondary = "重新连接" to onReconnect,

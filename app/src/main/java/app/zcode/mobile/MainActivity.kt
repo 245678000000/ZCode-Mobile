@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
                 val settings by appViewModel.settings.collectAsStateWithLifecycle()
                 val online by appViewModel.online.collectAsStateWithLifecycle()
                 val pendingInject by appViewModel.pendingInject.collectAsStateWithLifecycle()
+                val pageState by appViewModel.pageState.collectAsStateWithLifecycle()
                 val pendingShare by appViewModel.pendingShare.collectAsStateWithLifecycle()
                 val openApproval by appViewModel.openApproval.collectAsStateWithLifecycle()
                 val openTaskId by appViewModel.openTaskId.collectAsStateWithLifecycle()
@@ -209,7 +210,7 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.size(1.dp),
                                         observer = appViewModel.observer,
                                         retainedWebView = appViewModel.ensureWebView(this@MainActivity),
-                                        onState = { },
+                                        onState = { appViewModel.updatePageState(it) },
                                         onDownload = { u, n, m -> appViewModel.enqueueDownload(u, n, m) },
                                         onConnection = { appViewModel.events.ingestConnection(it) },
                                         webViewRef = { },
@@ -235,6 +236,8 @@ class MainActivity : ComponentActivity() {
                                 bridge = appViewModel.webBridge,
                                 observer = appViewModel.observer,
                                 retainedWebView = appViewModel.ensureWebView(this@MainActivity),
+                                pageState = pageState,
+                                onPageState = { appViewModel.updatePageState(it) },
                                 pendingInject = pendingInject,
                                 onConsumeInject = { appViewModel.consumeInject() },
                                 onConnected = { appViewModel.remoteManager.markConnected(it) },
