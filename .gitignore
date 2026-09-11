@@ -19,4 +19,10 @@ out/
 *.jks
 *.keystore
 !debug.keystore
+keystore.properties
 .kotlin
+
+# Unrelated tooling that lives next to this repo
+/app-onboarding/
+/.agents/
+/skills-lock.json

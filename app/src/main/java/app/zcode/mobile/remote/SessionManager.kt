@@ -10,7 +10,8 @@ class SessionManager {
 
     fun attach(webView: WebView) {
         cookies.setAcceptCookie(true)
-        cookies.setAcceptThirdPartyCookies(webView, true)
+        // The Remote page is single-origin; third-party cookies are not needed.
+        cookies.setAcceptThirdPartyCookies(webView, false)
     }
 
     fun persist() {

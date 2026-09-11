@@ -5,7 +5,6 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import app.zcode.mobile.util.AppLog
-import org.json.JSONObject
 import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -54,16 +53,11 @@ class SecureStorage(context: Context) {
         if (!file.exists()) return Payload()
         return try {
             val decoded = Base64.decode(file.readText(), Base64.NO_WRAP)
-            if (decoded.size < IV_SIZE + 1) return Payload()
-            val iv = decoded.copyOfRange(0, IV_SIZE)
-            val cipherBytes = decoded.copyOfRange(IV_SIZE, decoded.size)
+            val (iv, cipherBytes) = SecurePayloadCodec.unpack(decoded, IV_SIZE) ?: return Payload()
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
-            val json = JSONObject(String(cipher.doFinal(cipherBytes), Charsets.UTF_8))
-            Payload(
-                remoteUrl = json.optString(KEY_REMOTE_URL).ifBlank { null },
-                deviceName = json.optString(KEY_DEVICE_NAME, "ZCode Desktop"),
-            )
+            val (remoteUrl, deviceName) = SecurePayloadCodec.decodeJson(String(cipher.doFinal(cipherBytes), Charsets.UTF_8))
+            Payload(remoteUrl = remoteUrl, deviceName = deviceName)
         } catch (t: Throwable) {
             AppLog.e(TAG, "failed to read secure payload", t)
             Payload()
@@ -72,17 +66,11 @@ class SecureStorage(context: Context) {
 
     private fun writeUnlocked() {
         try {
-            val json = JSONObject()
-                .put(KEY_REMOTE_URL, cache.remoteUrl ?: "")
-                .put(KEY_DEVICE_NAME, cache.deviceName)
-                .toString()
+            val json = SecurePayloadCodec.encodeJson(cache.remoteUrl, cache.deviceName)
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
-            val iv = cipher.iv
             val encrypted = cipher.doFinal(json.toByteArray(Charsets.UTF_8))
-            val packed = ByteArray(iv.size + encrypted.size)
-            System.arraycopy(iv, 0, packed, 0, iv.size)
-            System.arraycopy(encrypted, 0, packed, iv.size, encrypted.size)
+            val packed = SecurePayloadCodec.pack(cipher.iv, encrypted)
             file.writeText(Base64.encodeToString(packed, Base64.NO_WRAP))
         } catch (t: Throwable) {
             AppLog.e(TAG, "failed to write secure payload", t)
@@ -119,7 +107,5 @@ class SecureStorage(context: Context) {
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val IV_SIZE = 12
         private const val GCM_TAG_BITS = 128
-        private const val KEY_REMOTE_URL = "remote_url"
-        private const val KEY_DEVICE_NAME = "device_name"
     }
 }

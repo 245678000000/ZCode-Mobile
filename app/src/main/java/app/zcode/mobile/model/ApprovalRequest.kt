@@ -1,9 +1,10 @@
 package app.zcode.mobile.model
 
 enum class RiskLevel {
-    Low,
-    Medium,
-    High,
+    LOW,
+    MEDIUM,
+    HIGH,
+    UNKNOWN,
 }
 
 data class ApprovalRequest(
@@ -12,7 +13,11 @@ data class ApprovalRequest(
     val description: String,
     val command: String,
     val riskLevel: RiskLevel,
+    val source: String = "dom",
     val timestamp: Long = System.currentTimeMillis(),
+    val taskId: String? = null,
+    val allowLabel: String? = null,
+    val rejectLabel: String? = null,
 ) {
     companion object {
         fun demo(): ApprovalRequest = ApprovalRequest(
@@ -20,7 +25,8 @@ data class ApprovalRequest(
             title = "ZCode · 需要授权",
             description = "删除 3 个旧文件",
             command = "rm -rf legacy/",
-            riskLevel = RiskLevel.High,
+            riskLevel = RiskLevel.HIGH,
+            source = "developer-demo",
         )
     }
 }

@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Matches the ZCode desktop icon: near-black tile with a subtle top-to-bottom falloff. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#0F1114"
-        android:pathData="M0,0h108v108H0z" />
+    <path android:pathData="M0,0h108v108H0z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startColor="#1E1E1E"
+                android:endColor="#000000"
+                android:startY="0"
+                android:endY="108"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
 </vector>

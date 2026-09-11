@@ -3,10 +3,10 @@ package app.zcode.mobile.remote
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.MutableContextWrapper
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
-import android.os.Build
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
@@ -24,6 +24,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import app.zcode.mobile.BuildConfig
+import app.zcode.mobile.model.ConnectionState
 import app.zcode.mobile.util.AppLog
 import app.zcode.mobile.util.RemoteUrl
 
@@ -40,6 +42,7 @@ enum class RemoteErrorKind {
     Ssl,
     Http404,
     Http500,
+    SessionExpired,
     Timeout,
     Generic,
 }
@@ -58,8 +61,11 @@ fun ZCodeWebView(
     sessionManager: SessionManager,
     bridge: ZCodeWebBridge,
     modifier: Modifier = Modifier,
+    observer: ZCodeDomObserver? = null,
+    retainedWebView: WebView? = null,
     onState: (RemotePageState) -> Unit,
     onDownload: (String, String?, String?) -> Unit,
+    onConnection: (ConnectionState) -> Unit = {},
     webViewRef: (WebView) -> Unit,
 ) {
     val origin = remember(config.remoteUrl) { RemoteUrl.origin(config.remoteUrl) }
@@ -72,22 +78,33 @@ fun ZCodeWebView(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            WebView(context).apply {
+            val webView = retainedWebView?.also { existing ->
+                (existing.parent as? ViewGroup)?.removeView(existing)
+            } ?: WebView(MutableContextWrapper(context.applicationContext))
+            // Bind to the hosting Activity only while attached; released below.
+            (webView.context as? MutableContextWrapper)?.baseContext = context
+            webView.apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
                 configureSettings(this, config, httpsRemote)
                 sessionManager.attach(this)
+                removeJavascriptInterface(ZCodeWebBridge.JS_NAME)
+                removeJavascriptInterface(ZCodeWebBridge.LEGACY_JS_NAME)
                 addJavascriptInterface(bridge, ZCodeWebBridge.JS_NAME)
+                addJavascriptInterface(bridge, ZCodeWebBridge.LEGACY_JS_NAME)
                 webViewClient = object : WebViewClient() {
                     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                         onState(RemotePageState.Loading)
+                        onConnection(ConnectionState.CONNECTING)
                     }
 
                     override fun onPageFinished(view: WebView?, url: String?) {
                         sessionManager.persist()
                         onState(RemotePageState.Ready(view?.title))
+                        onConnection(ConnectionState.CONNECTED)
+                        view?.let { observer?.install(it) }
                     }
 
                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -114,6 +131,7 @@ fun ZCodeWebView(
                             else -> RemoteErrorKind.Generic
                         }
                         onState(RemotePageState.Error(kind, error?.description?.toString()))
+                        onConnection(ConnectionState.ERROR)
                     }
 
                     override fun onReceivedHttpError(
@@ -122,13 +140,15 @@ fun ZCodeWebView(
                         errorResponse: WebResourceResponse?,
                     ) {
                         if (request?.isForMainFrame != true) return
-                        val code = errorResponse?.statusCode ?: return
-                        val kind = when (code) {
-                            404 -> RemoteErrorKind.Http404
-                            in 500..599 -> RemoteErrorKind.Http500
-                            else -> return
+                        when (val code = errorResponse?.statusCode ?: return) {
+                            401, 403 -> {
+                                onState(RemotePageState.Error(RemoteErrorKind.SessionExpired, "HTTP $code"))
+                                onConnection(ConnectionState.SESSION_EXPIRED)
+                            }
+                            404 -> onState(RemotePageState.Error(RemoteErrorKind.Http404, "HTTP $code"))
+                            in 500..599 -> onState(RemotePageState.Error(RemoteErrorKind.Http500, "HTTP $code"))
+                            else -> Unit
                         }
-                        onState(RemotePageState.Error(kind, "HTTP $code"))
                     }
 
                     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
@@ -144,13 +164,15 @@ fun ZCodeWebView(
                         resultMsg: android.os.Message?,
                     ): Boolean {
                         val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
-                        val temp = WebView(context)
+                        // Throwaway WebView: only used to learn the popup's target URL, then destroyed.
+                        val temp = WebView(context.applicationContext)
                         temp.webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                 val url = request?.url?.toString() ?: return true
                                 handleUrl(context, url, origin, config.allowExternalLinks, loadInParent = {
                                     this@apply.loadUrl(it)
                                 })
+                                view?.post { runCatching { view.destroy() } }
                                 return true
                             }
                         }
@@ -165,11 +187,19 @@ fun ZCodeWebView(
                     onDownload(url, name, mimeType)
                 })
                 webViewRef(this)
-                loadUrl(config.remoteUrl)
+                val current = url
+                if (current.isNullOrBlank() || current == "about:blank") {
+                    loadUrl(config.remoteUrl)
+                }
             }
         },
         update = { view ->
             webViewRef(view)
+        },
+        onRelease = { view ->
+            sessionManager.persist()
+            // Drop the Activity reference; the WebView itself is retained by the ViewModel.
+            (view.context as? MutableContextWrapper)?.baseContext = view.context.applicationContext
         },
     )
 }
@@ -194,11 +224,10 @@ private fun configureSettings(webView: WebView, config: RemoteWebConfig, httpsRe
         }
         allowFileAccess = config.allowFileAccess
         allowContentAccess = config.allowFileAccess
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            safeBrowsingEnabled = true
+        safeBrowsingEnabled = true
+        if (!userAgentString.contains("ZCodeMobile/")) {
+            userAgentString = "$userAgentString ZCodeMobile/${BuildConfig.VERSION_NAME}"
         }
-        userAgentString = "$userAgentString ZCodeMobile/0.1.0"
-        mediaPlaybackRequiresUserGesture = false
     }
     CookieManager.getInstance().setAcceptCookie(true)
     WebView.setWebContentsDebuggingEnabled(false)

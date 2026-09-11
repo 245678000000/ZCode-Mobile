@@ -10,10 +10,9 @@ object AppLog {
         }
     }
 
+    /** Errors are logged in every build type; [sanitize] strips auth material first. */
     fun e(tag: String, message: String, throwable: Throwable? = null) {
-        if (BuildConfig.DEBUG) {
-            Log.e(tag, sanitize(message), throwable)
-        }
+        Log.e(tag, sanitize(message), throwable)
     }
 
     fun sanitize(value: String): String {

@@ -11,18 +11,50 @@ android {
         applicationId = "app.zcode.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.2.1"
         vectorDrawables.useSupportLibrary = true
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     signingConfigs {
+        // Release signing, in order of precedence:
+        //   1. RELEASE_STORE_FILE / RELEASE_STORE_PASSWORD / RELEASE_KEY_ALIAS / RELEASE_KEY_PASSWORD env vars (CI)
+        //   2. keystore.properties at the repo root (local, git-ignored)
+        //   3. the debug keystore — installable, but NOT upgradeable across machines
         create("release") {
-            // Local unsigned-installable APK. Replace with your own keystore before publishing.
-            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            val env = System.getenv()
+            val propsFile = rootProject.file("keystore.properties")
+            when {
+                !env["RELEASE_STORE_FILE"].isNullOrBlank() -> {
+                    storeFile = rootProject.file(env.getValue("RELEASE_STORE_FILE"))
+                    storePassword = env["RELEASE_STORE_PASSWORD"]
+                    keyAlias = env["RELEASE_KEY_ALIAS"]
+                    keyPassword = env["RELEASE_KEY_PASSWORD"]
+                }
+                propsFile.exists() -> {
+                    val props = propsFile.readLines()
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+                        .associate { line ->
+                            val i = line.indexOf('=')
+                            line.substring(0, i) to line.substring(i + 1)
+                        }
+                    storeFile = rootProject.file(props.getValue("storeFile"))
+                    storePassword = props.getValue("storePassword")
+                    keyAlias = props.getValue("keyAlias")
+                    keyPassword = props.getValue("keyPassword")
+                }
+                else -> {
+                    logger.warn("No release keystore configured; signing release with the debug keystore.")
+                    storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
+            }
         }
     }
 
@@ -62,8 +94,9 @@ android {
     }
 
     lint {
-        abortOnError = false
-        checkReleaseBuilds = false
+        abortOnError = true
+        checkReleaseBuilds = true
+        warningsAsErrors = false
     }
 }
 
@@ -91,7 +124,6 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.documentfile)
 
@@ -100,6 +132,10 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.coil.compose)
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

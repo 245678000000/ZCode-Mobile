@@ -14,17 +14,25 @@ enum class ArtifactKind {
 }
 
 data class Artifact(
+    val id: String = "",
+    val taskId: String? = null,
     val name: String,
-    val uri: Uri,
     val kind: ArtifactKind,
+    val sourceUrl: String? = null,
+    val localUri: Uri? = null,
     val mimeType: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
 ) {
+    val uri: Uri
+        get() = localUri ?: sourceUrl?.let { Uri.parse(it) } ?: Uri.EMPTY
+
     companion object {
         fun from(name: String, uri: Uri, mimeType: String? = null): Artifact {
             return Artifact(
+                id = name,
                 name = name,
-                uri = uri,
                 kind = kindFor(name, mimeType),
+                localUri = uri,
                 mimeType = mimeType,
             )
         }
@@ -32,17 +40,18 @@ data class Artifact(
         fun kindFor(name: String, mimeType: String? = null): ArtifactKind {
             val lower = name.lowercase()
             val mime = mimeType?.lowercase().orEmpty()
+            val path = lower.substringBefore('?')
             return when {
-                lower.endsWith(".md") || mime.contains("markdown") -> ArtifactKind.Markdown
-                lower.endsWith(".html") || lower.endsWith(".htm") || mime.contains("text/html") -> ArtifactKind.Html
-                lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
-                    lower.endsWith(".webp") || lower.endsWith(".gif") || mime.startsWith("image/") -> ArtifactKind.Image
-                lower.endsWith(".pdf") || mime.contains("pdf") -> ArtifactKind.Pdf
-                lower.endsWith(".json") || mime.contains("json") -> ArtifactKind.Json
-                lower.endsWith(".kt") || lower.endsWith(".java") || lower.endsWith(".ts") ||
-                    lower.endsWith(".tsx") || lower.endsWith(".js") || lower.endsWith(".py") ||
-                    lower.endsWith(".go") || lower.endsWith(".rs") || lower.endsWith(".sh") -> ArtifactKind.Code
-                lower.endsWith(".txt") || mime.startsWith("text/") -> ArtifactKind.Text
+                path.endsWith(".md") || mime.contains("markdown") -> ArtifactKind.Markdown
+                path.endsWith(".html") || path.endsWith(".htm") || mime.contains("text/html") -> ArtifactKind.Html
+                path.endsWith(".png") || path.endsWith(".jpg") || path.endsWith(".jpeg") ||
+                    path.endsWith(".webp") || path.endsWith(".gif") || mime.startsWith("image/") -> ArtifactKind.Image
+                path.endsWith(".pdf") || mime.contains("pdf") -> ArtifactKind.Pdf
+                path.endsWith(".json") || mime.contains("json") -> ArtifactKind.Json
+                path.endsWith(".kt") || path.endsWith(".java") || path.endsWith(".ts") ||
+                    path.endsWith(".tsx") || path.endsWith(".js") || path.endsWith(".py") ||
+                    path.endsWith(".go") || path.endsWith(".rs") || path.endsWith(".sh") -> ArtifactKind.Code
+                path.endsWith(".txt") || mime.startsWith("text/") -> ArtifactKind.Text
                 else -> ArtifactKind.Unknown
             }
         }

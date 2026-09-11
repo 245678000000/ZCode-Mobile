@@ -16,6 +16,7 @@ data class AppSettings(
     val approvalNotifications: Boolean = true,
     val allowDownloads: Boolean = true,
     val allowExternalLinks: Boolean = true,
+    val developerMode: Boolean = false,
 )
 
 class SettingsStore(context: Context) {
@@ -28,6 +29,7 @@ class SettingsStore(context: Context) {
             approvalNotifications = prefs[Keys.APPROVAL_NOTIFICATIONS] ?: true,
             allowDownloads = prefs[Keys.ALLOW_DOWNLOADS] ?: true,
             allowExternalLinks = prefs[Keys.ALLOW_EXTERNAL] ?: true,
+            developerMode = prefs[Keys.DEVELOPER] ?: false,
         )
     }
 
@@ -36,6 +38,7 @@ class SettingsStore(context: Context) {
     suspend fun setApprovalNotifications(value: Boolean) = set(Keys.APPROVAL_NOTIFICATIONS, value)
     suspend fun setAllowDownloads(value: Boolean) = set(Keys.ALLOW_DOWNLOADS, value)
     suspend fun setAllowExternalLinks(value: Boolean) = set(Keys.ALLOW_EXTERNAL, value)
+    suspend fun setDeveloperMode(value: Boolean) = set(Keys.DEVELOPER, value)
 
     private suspend fun set(key: Preferences.Key<Boolean>, value: Boolean) {
         dataStore.edit { it[key] = value }
@@ -47,5 +50,6 @@ class SettingsStore(context: Context) {
         val APPROVAL_NOTIFICATIONS = booleanPreferencesKey("approval_notifications")
         val ALLOW_DOWNLOADS = booleanPreferencesKey("allow_downloads")
         val ALLOW_EXTERNAL = booleanPreferencesKey("allow_external_links")
+        val DEVELOPER = booleanPreferencesKey("developer_mode")
     }
 }

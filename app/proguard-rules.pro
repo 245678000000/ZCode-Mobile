@@ -12,6 +12,7 @@
 -keepclassmembers class app.zcode.mobile.remote.ZCodeWebBridge {
     public *;
 }
+-keep class app.zcode.mobile.remote.ZCodeWebBridge { *; }
 
 -keep class com.google.mlkit.** { *; }
 -dontwarn com.google.mlkit.**

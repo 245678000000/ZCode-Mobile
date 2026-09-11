@@ -21,52 +21,73 @@ class TaskNotificationManager(context: Context) {
         ensureChannel()
     }
 
-    fun notifyTaskCompleted(task: Task) {
-        val intent = Intent(appContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(EXTRA_OPEN_REMOTE, true)
+    fun notifyTaskCompleted(task: Task, openTaskId: String? = task.id) {
+        notify(
+            id = task.id.hashCode(),
+            title = "任务已完成",
+            text = task.title,
+            high = false,
+        ) {
+            putExtra(EXTRA_OPEN_TASK_ID, openTaskId ?: task.id)
         }
-        val pending = PendingIntent.getActivity(
-            appContext,
-            task.id.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_zcode)
-            .setContentTitle("任务已完成")
-            .setContentText(task.summary ?: task.title)
-            .setSubText("ZCode")
-            .setStyle(NotificationCompat.BigTextStyle().bigText(task.summary ?: task.title))
-            .setAutoCancel(true)
-            .setContentIntent(pending)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        runCatching { manager.notify(task.id.hashCode(), notification) }
+    }
+
+    fun notifyTaskFailed(task: Task, openTaskId: String? = task.id) {
+        notify(
+            id = ("fail-" + task.id).hashCode(),
+            title = "任务执行失败",
+            text = task.title,
+            high = true,
+        ) {
+            putExtra(EXTRA_OPEN_TASK_ID, openTaskId ?: task.id)
+        }
     }
 
     fun notifyApproval(request: ApprovalRequest) {
-        val intent = Intent(appContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        notify(
+            id = request.id.hashCode(),
+            title = "ZCode · 需要确认",
+            text = request.description.ifBlank { request.title },
+            high = true,
+        ) {
             putExtra(EXTRA_OPEN_APPROVAL, true)
             putExtra(EXTRA_APPROVAL_ID, request.id)
         }
+    }
+
+    private fun notify(
+        id: Int,
+        title: String,
+        text: String,
+        high: Boolean,
+        extras: Intent.() -> Unit,
+    ) {
+        val intent = Intent(appContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            extras()
+        }
         val pending = PendingIntent.getActivity(
             appContext,
-            request.id.hashCode(),
+            id,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_zcode)
-            .setContentTitle(request.title)
-            .setContentText(request.description)
+            .setContentTitle(title)
+            .setContentText(text)
             .setSubText("ZCode")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
             .setContentIntent(pending)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (high) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        runCatching { manager.notify(request.id.hashCode(), notification) }
+        if (!manager.areNotificationsEnabled()) return
+        try {
+            manager.notify(id, notification)
+        } catch (_: SecurityException) {
+            // POST_NOTIFICATIONS was revoked between the check and the call.
+        }
     }
 
     private fun ensureChannel() {
@@ -74,7 +95,7 @@ class TaskNotificationManager(context: Context) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT,
+                NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = "ZCode task and approval updates"
             }
@@ -86,8 +107,8 @@ class TaskNotificationManager(context: Context) {
     companion object {
         const val CHANNEL_ID = "zcode_tasks"
         const val CHANNEL_NAME = "ZCode Tasks"
-        const val EXTRA_OPEN_REMOTE = "open_remote"
         const val EXTRA_OPEN_APPROVAL = "open_approval"
         const val EXTRA_APPROVAL_ID = "approval_id"
+        const val EXTRA_OPEN_TASK_ID = "open_task_id"
     }
 }
