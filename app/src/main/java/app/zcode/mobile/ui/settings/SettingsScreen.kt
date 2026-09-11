@@ -119,13 +119,13 @@ fun SettingsScreen(
 
             GroupLabel("更多")
             ListRow(title = "示例 Markdown 预览", chevron = true, onClick = onPreviewSample)
-            if (BuildConfig.DEBUG) {
+            Hairline()
+            ToggleRow("开发者模式", settings.developerMode, caption = "显示调试面板与 WebView 日志") {
+                scope.launch { store.setDeveloperMode(it) }
+            }
+            if (developer) {
                 Hairline()
-                ToggleRow("Developer Mode", settings.developerMode) {
-                    scope.launch { store.setDeveloperMode(it) }
-                }
-                Hairline()
-                ListRow(title = "Debug Panel", chevron = true, onClick = onDeveloper)
+                ListRow(title = "调试面板", caption = "连接状态、识别到的任务、WebView 日志", chevron = true, onClick = onDeveloper)
             }
 
             GroupLabel("关于")

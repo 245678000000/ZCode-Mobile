@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  LAN Remote Control sessions are often served over HTTP on a private network.
-  HTTPS pages still reject mixed content inside WebView.
+  Trust the system store plus user-installed CAs, matching Chrome on the same phone:
+  people running a local proxy/VPN with its own CA otherwise get an SSL error here
+  while the same link works in Chrome. Cleartext stays allowed for LAN Remote sessions
+  (RemoteUrl already rejects http:// to public hosts).
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

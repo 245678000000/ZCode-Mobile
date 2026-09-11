@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -92,7 +95,16 @@ fun HomeScreen(
             .background(c.surface)
             .imePadding(),
     ) {
-        Box(Modifier.size(1.dp)) { observerSlot() }
+        // The shared WebView is hosted here at real screen size but parked below the
+        // viewport: a 1dp host gave the page a 1px viewport, which some layouts never recover from.
+        val screen = LocalConfiguration.current
+        Box(Modifier.size(1.dp)) {
+            Box(
+                Modifier
+                    .requiredSize(screen.screenWidthDp.dp, screen.screenHeightDp.dp)
+                    .offset(y = screen.screenHeightDp.dp + 64.dp),
+            ) { observerSlot() }
+        }
 
         // Top bar: wordmark left, connection + settings right.
         Row(

@@ -73,6 +73,8 @@ class MainActivity : ComponentActivity() {
                 val online by appViewModel.online.collectAsStateWithLifecycle()
                 val pendingInject by appViewModel.pendingInject.collectAsStateWithLifecycle()
                 val pageState by appViewModel.pageState.collectAsStateWithLifecycle()
+                val pageProgress by appViewModel.pageProgress.collectAsStateWithLifecycle()
+                val webLog by appViewModel.webLog.collectAsStateWithLifecycle()
                 val pendingShare by appViewModel.pendingShare.collectAsStateWithLifecycle()
                 val openApproval by appViewModel.openApproval.collectAsStateWithLifecycle()
                 val openTaskId by appViewModel.openTaskId.collectAsStateWithLifecycle()
@@ -213,6 +215,9 @@ class MainActivity : ComponentActivity() {
                                         onState = { appViewModel.updatePageState(it) },
                                         onDownload = { u, n, m -> appViewModel.enqueueDownload(u, n, m) },
                                         onConnection = { appViewModel.events.ingestConnection(it) },
+                                        onProgress = { appViewModel.updatePageProgress(it) },
+                                        onRendererGone = { appViewModel.onRendererGone() },
+                                        log = { appViewModel.logWeb(it) },
                                         webViewRef = { },
                                     )
                                 }
@@ -237,7 +242,11 @@ class MainActivity : ComponentActivity() {
                                 observer = appViewModel.observer,
                                 retainedWebView = appViewModel.ensureWebView(this@MainActivity),
                                 pageState = pageState,
+                                pageProgress = pageProgress,
                                 onPageState = { appViewModel.updatePageState(it) },
+                                onProgress = { appViewModel.updatePageProgress(it) },
+                                onRendererGone = { appViewModel.onRendererGone() },
+                                log = { appViewModel.logWeb(it) },
                                 pendingInject = pendingInject,
                                 onConsumeInject = { appViewModel.consumeInject() },
                                 onConnected = { appViewModel.remoteManager.markConnected(it) },
@@ -331,6 +340,8 @@ class MainActivity : ComponentActivity() {
                             approvals = approvals,
                             artifacts = artifacts,
                             dump = appViewModel.events.sanitizedDebugDump(),
+                            webLog = webLog,
+                            pageState = pageState,
                             onBack = { nav.popBackStack() },
                             onInjectFixture = { appViewModel.injectDeveloperFixture() },
                         )

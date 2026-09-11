@@ -95,6 +95,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _pageState.value = state
     }
 
+    private val _pageProgress = MutableStateFlow(0)
+    val pageProgress: StateFlow<Int> = _pageProgress.asStateFlow()
+
+    fun updatePageProgress(progress: Int) {
+        _pageProgress.value = progress
+    }
+
+    /** Last ~200 WebView diagnostics (navigation, console, errors); sanitized, shown in Developer. */
+    private val _webLog = MutableStateFlow<List<String>>(emptyList())
+    val webLog: StateFlow<List<String>> = _webLog.asStateFlow()
+    private val webLogFormat = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+
+    fun logWeb(line: String) {
+        val entry = "${webLogFormat.format(java.util.Date())} ${AppLog.sanitize(line)}"
+        _webLog.value = (_webLog.value + entry).takeLast(200)
+    }
+
+    /** The renderer died; the WebView is unusable. Drop it so the next mount builds a new one. */
+    fun onRendererGone() {
+        runCatching { webView?.destroy() }
+        webView = null
+    }
+
     private val _pendingInject = MutableStateFlow<String?>(null)
     val pendingInject: StateFlow<String?> = _pendingInject.asStateFlow()
 

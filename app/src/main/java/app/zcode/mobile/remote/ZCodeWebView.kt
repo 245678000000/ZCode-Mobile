@@ -8,8 +8,10 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
@@ -44,7 +46,13 @@ enum class RemoteErrorKind {
     Http500,
     SessionExpired,
     Timeout,
+    RendererGone,
     Generic,
+}
+
+/** Receives page/console/network diagnostics; shown in the Developer panel. */
+fun interface WebLogSink {
+    fun log(line: String)
 }
 
 data class RemoteWebConfig(
@@ -66,6 +74,9 @@ fun ZCodeWebView(
     onState: (RemotePageState) -> Unit,
     onDownload: (String, String?, String?) -> Unit,
     onConnection: (ConnectionState) -> Unit = {},
+    onProgress: (Int) -> Unit = {},
+    onRendererGone: () -> Unit = {},
+    log: WebLogSink = WebLogSink {},
     webViewRef: (WebView) -> Unit,
 ) {
     val origin = remember(config.remoteUrl) { RemoteUrl.origin(config.remoteUrl) }
@@ -95,13 +106,21 @@ fun ZCodeWebView(
                 addJavascriptInterface(bridge, ZCodeWebBridge.JS_NAME)
                 addJavascriptInterface(bridge, ZCodeWebBridge.LEGACY_JS_NAME)
                 webViewClient = object : WebViewClient() {
+                    // Set by any main-frame failure during the current load; WebView still fires
+                    // onPageFinished for its error page, which must not read as "connected".
+                    private var mainFrameFailed = false
+
                     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                        mainFrameFailed = false
+                        log.log("page start ${RemoteUrl.redacted(url.orEmpty())}")
                         onState(RemotePageState.Loading)
                         onConnection(ConnectionState.CONNECTING)
                     }
 
                     override fun onPageFinished(view: WebView?, url: String?) {
                         sessionManager.persist()
+                        log.log("page finished failed=$mainFrameFailed title=${view?.title?.take(40)}")
+                        if (mainFrameFailed) return
                         onState(RemotePageState.Ready(view?.title))
                         onConnection(ConnectionState.CONNECTED)
                         view?.let { observer?.install(it) }
@@ -109,7 +128,15 @@ fun ZCodeWebView(
 
                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                         val url = request?.url?.toString() ?: return false
-                        return handleUrl(context, url, origin, config.allowExternalLinks)
+                        // Redirects and script-driven navigations (no user gesture) stay inside
+                        // the WebView even when cross-origin; only tapped links may leave the app.
+                        if (request.isForMainFrame && (request.isRedirect || !request.hasGesture())) {
+                            log.log("nav keep ${RemoteUrl.redacted(url)}")
+                            return false
+                        }
+                        val handled = handleUrl(context, url, origin, config.allowExternalLinks)
+                        log.log("nav ${if (handled) "external" else "keep"} ${RemoteUrl.redacted(url)}")
+                        return handled
                     }
 
                     @Deprecated("Deprecated in Java")
@@ -123,14 +150,17 @@ fun ZCodeWebView(
                         request: WebResourceRequest?,
                         error: WebResourceError?,
                     ) {
-                        if (request?.isForMainFrame != true) return
+                        val main = request?.isForMainFrame == true
+                        log.log("error${if (main) " MAIN" else ""} code=${error?.errorCode} ${error?.description} ${RemoteUrl.redacted(request?.url?.toString().orEmpty())}")
+                        if (!main) return
+                        mainFrameFailed = true
                         val kind = when (error?.errorCode) {
                             ERROR_HOST_LOOKUP -> RemoteErrorKind.Dns
                             ERROR_TIMEOUT -> RemoteErrorKind.Timeout
                             ERROR_CONNECT, ERROR_FAILED_SSL_HANDSHAKE -> RemoteErrorKind.Ssl
                             else -> RemoteErrorKind.Generic
                         }
-                        onState(RemotePageState.Error(kind, error?.description?.toString()))
+                        onState(RemotePageState.Error(kind, "${error?.errorCode} ${error?.description}"))
                         onConnection(ConnectionState.ERROR)
                     }
 
@@ -139,24 +169,48 @@ fun ZCodeWebView(
                         request: WebResourceRequest?,
                         errorResponse: WebResourceResponse?,
                     ) {
-                        if (request?.isForMainFrame != true) return
+                        val main = request?.isForMainFrame == true
+                        log.log("http${if (main) " MAIN" else ""} ${errorResponse?.statusCode} ${RemoteUrl.redacted(request?.url?.toString().orEmpty())}")
+                        if (!main) return
                         when (val code = errorResponse?.statusCode ?: return) {
                             401, 403 -> {
+                                mainFrameFailed = true
                                 onState(RemotePageState.Error(RemoteErrorKind.SessionExpired, "HTTP $code"))
                                 onConnection(ConnectionState.SESSION_EXPIRED)
                             }
-                            404 -> onState(RemotePageState.Error(RemoteErrorKind.Http404, "HTTP $code"))
-                            in 500..599 -> onState(RemotePageState.Error(RemoteErrorKind.Http500, "HTTP $code"))
+                            404 -> { mainFrameFailed = true; onState(RemotePageState.Error(RemoteErrorKind.Http404, "HTTP $code")) }
+                            in 500..599 -> { mainFrameFailed = true; onState(RemotePageState.Error(RemoteErrorKind.Http500, "HTTP $code")) }
                             else -> Unit
                         }
                     }
 
                     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+                        log.log("ssl error primary=${error?.primaryError} ${RemoteUrl.redacted(error?.url.orEmpty())}")
                         handler?.cancel()
-                        onState(RemotePageState.Error(RemoteErrorKind.Ssl, "TLS error"))
+                        mainFrameFailed = true
+                        onState(RemotePageState.Error(RemoteErrorKind.Ssl, "SSL ${sslErrorName(error?.primaryError)}"))
+                        onConnection(ConnectionState.ERROR)
+                    }
+
+                    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+                        // A crashed renderer leaves a blank WebView that can never recover; drop it.
+                        log.log("renderer gone crash=${detail?.didCrash()} priority=${detail?.rendererPriorityAtExit()}")
+                        onState(RemotePageState.Error(RemoteErrorKind.RendererGone, if (detail?.didCrash() == true) "crash" else "killed"))
+                        onRendererGone()
+                        return true
                     }
                 }
                 webChromeClient = object : WebChromeClient() {
+                    override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                        onProgress(newProgress)
+                    }
+
+                    override fun onConsoleMessage(message: ConsoleMessage?): Boolean {
+                        val m = message ?: return false
+                        log.log("console ${m.messageLevel()} ${m.message().take(300)} (${m.sourceId().substringAfterLast('/').take(40)}:${m.lineNumber()})")
+                        return true
+                    }
+
                     override fun onCreateWindow(
                         view: WebView?,
                         isDialog: Boolean,
@@ -198,8 +252,13 @@ fun ZCodeWebView(
         },
         onRelease = { view ->
             sessionManager.persist()
-            // Drop the Activity reference; the WebView itself is retained by the ViewModel.
-            (view.context as? MutableContextWrapper)?.baseContext = view.context.applicationContext
+            // Drop the Activity reference unless another host (Home <-> Remote) already took
+            // the view; the WebView itself is retained by the ViewModel.
+            view.post {
+                if (!view.isAttachedToWindow) {
+                    (view.context as? MutableContextWrapper)?.baseContext = view.context.applicationContext
+                }
+            }
         },
     )
 }
@@ -260,4 +319,14 @@ private fun handleUrl(
     if (scheme == "intent" || scheme == "market") return true
     if (scheme == "file" || scheme == "content") return true
     return true
+}
+
+private fun sslErrorName(code: Int?): String = when (code) {
+    SslError.SSL_NOTYETVALID -> "not yet valid"
+    SslError.SSL_EXPIRED -> "expired"
+    SslError.SSL_IDMISMATCH -> "hostname mismatch"
+    SslError.SSL_UNTRUSTED -> "untrusted CA"
+    SslError.SSL_DATE_INVALID -> "date invalid"
+    SslError.SSL_INVALID -> "invalid"
+    else -> "error $code"
 }

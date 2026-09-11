@@ -38,6 +38,7 @@ import android.net.Uri
 import app.zcode.mobile.data.AppSettings
 import app.zcode.mobile.remote.RemoteErrorKind
 import app.zcode.mobile.remote.RemotePageState
+import app.zcode.mobile.remote.WebLogSink
 import app.zcode.mobile.model.ConnectionState
 import app.zcode.mobile.remote.RemoteWebConfig
 import app.zcode.mobile.remote.SessionManager
@@ -61,7 +62,11 @@ fun RemoteScreen(
     observer: ZCodeDomObserver,
     retainedWebView: WebView?,
     pageState: RemotePageState,
+    pageProgress: Int,
     onPageState: (RemotePageState) -> Unit,
+    onProgress: (Int) -> Unit,
+    onRendererGone: () -> Unit,
+    log: WebLogSink,
     pendingInject: String?,
     onConsumeInject: () -> String?,
     onConnected: (Boolean) -> Unit,
@@ -133,7 +138,7 @@ fun RemoteScreen(
                     text = when (pageState) {
                         is RemotePageState.Ready -> "已连接"
                         is RemotePageState.Error -> "连接失败"
-                        else -> "连接中…"
+                        else -> if (pageProgress in 1..99) "加载中 $pageProgress%" else "连接中…"
                     },
                     color = when (pageState) {
                         is RemotePageState.Ready -> c.success
@@ -187,6 +192,9 @@ fun RemoteScreen(
                     onState = onPageState,
                     onDownload = onDownload,
                     onConnection = onConnection,
+                    onProgress = onProgress,
+                    onRendererGone = onRendererGone,
+                    log = log,
                     webViewRef = {
                         webView = it
                         onWebView(it)
@@ -215,7 +223,7 @@ fun RemoteScreen(
                 ) {
                     ErrorPanel(
                         title = "无法连接 ZCode",
-                        reasons = reasonsFor(error.kind),
+                        reasons = reasonsFor(error.kind) + listOfNotNull(error.detail?.let { "详情：$it" }),
                         primary = "重试" to {
                             onPageState(RemotePageState.Loading)
                             webView?.reload()
@@ -240,6 +248,7 @@ private fun reasonsFor(kind: RemoteErrorKind): List<String> = when (kind) {
     RemoteErrorKind.Http404 -> listOf("Remote Control 已关闭", "Remote Session 已过期", "Remote URL 失效")
     RemoteErrorKind.Http500 -> listOf("电脑端 ZCode 异常", "Remote Control 已关闭")
     RemoteErrorKind.SessionExpired -> listOf("Remote Session 已过期", "请在电脑上重新生成 Remote 二维码")
+    RemoteErrorKind.RendererGone -> listOf("网页进程被系统回收或崩溃", "点重试会重新创建页面")
     RemoteErrorKind.Timeout -> listOf("电脑未启动 ZCode", "网络连接异常")
     RemoteErrorKind.Generic -> listOf(
         "电脑未启动 ZCode",

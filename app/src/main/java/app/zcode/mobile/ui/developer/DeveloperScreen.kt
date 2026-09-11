@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import app.zcode.mobile.model.ApprovalRequest
 import app.zcode.mobile.model.Artifact
 import app.zcode.mobile.model.ConnectionState
+import app.zcode.mobile.remote.RemotePageState
 import app.zcode.mobile.model.Task
 import app.zcode.mobile.model.ZCodeEvent
 import app.zcode.mobile.ui.components.CodeBlock
@@ -38,6 +39,8 @@ fun DeveloperScreen(
     approvals: List<ApprovalRequest>,
     artifacts: List<Artifact>,
     dump: String,
+    webLog: List<String> = emptyList(),
+    pageState: RemotePageState = RemotePageState.Idle,
     onBack: () -> Unit,
     onInjectFixture: () -> Unit,
 ) {
@@ -60,6 +63,7 @@ fun DeveloperScreen(
                 text = buildString {
                     appendLine("url        $url")
                     appendLine("connection $connection")
+                    appendLine("page       $pageState")
                     appendLine("observer   ${if (observerActive) "active" else "idle"}")
                     append("bridge     ZCodeAndroidBridge")
                 },
@@ -80,7 +84,12 @@ fun DeveloperScreen(
             events.take(50).forEach {
                 Text("${it.type}  ${it.timestamp}", color = c.fgSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
-            PrimaryButton(text = "Copy sanitized debug info", onClick = {
+            GroupLabel("WebView 日志 ${webLog.size}")
+            CodeBlock(text = if (webLog.isEmpty()) "（还没有日志，打开 Remote 页面后再回来看）" else webLog.takeLast(60).joinToString("\n"))
+            PrimaryButton(text = "复制 WebView 日志", onClick = {
+                clipboard.setText(AnnotatedString(webLog.joinToString("\n")))
+            })
+            SecondaryButton(text = "Copy sanitized debug info", onClick = {
                 clipboard.setText(AnnotatedString(dump))
             })
             SecondaryButton(text = "Inject developer fixture", onClick = onInjectFixture)
