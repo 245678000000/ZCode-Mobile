@@ -16,14 +16,17 @@
 The phone is a control surface. Code, terminal, Git, MCP, Skills and the Agent keep running in ZCode Desktop on your computer; the phone uses ZCode's own "Mobile Remote Control" page to watch progress, send tasks and receive notifications.
 
 ```text
-Android phone                        Computer
-┌──────────────────────┐            ┌──────────────────────┐
-│ ZCode Mobile         │  Remote URL │ ZCode Desktop        │
-│  · scan / paste link │───────────▶│  · Remote Control page│
-│  · official Remote   │◀───────────│  · Agent / terminal   │
-│    page in a WebView │  page state │  · Git / MCP / Skills │
-│  · task list, alerts │            │                       │
-└──────────────────────┘            └──────────────────────┘
+Android phone                          Computer
++----------------------------+         +----------------------------+
+| ZCode Mobile               |         | ZCode Desktop              |
+|                            |  Remote |                            |
+|  scan QR / paste link      |   URL   |  Mobile Remote Control     |
+|  official Remote page      | ------> |  page                      |
+|    in a WebView            |         |                            |
+|  task list, notifications  | <------ |  Agent / terminal / Git    |
+|                            |  page   |  MCP / Skills              |
+|                            |  state  |                            |
++----------------------------+         +----------------------------+
 ```
 
 No reverse engineering, no forged private protocol: the WebView loads the official Remote page, and tasks / approval prompts are read from what is **visible** on that page. When nothing can be read the page still works; the native list simply stays empty.

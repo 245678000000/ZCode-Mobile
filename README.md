@@ -16,13 +16,17 @@
 手机只是控制面板。代码、终端、Git、MCP、Skills 和 Agent 都还在电脑上的 ZCode Desktop 里跑，手机通过 ZCode 自带的「移动端远程控制」页面看进度、发任务、收通知。
 
 ```text
-Android 手机                         电脑
-┌──────────────────────┐            ┌──────────────────────┐
-│ ZCode Mobile         │  Remote URL │ ZCode Desktop        │
-│  · 扫码 / 粘贴链接    │───────────▶│  · 移动端远程控制页面 │
-│  · 内嵌官方 Remote 页 │◀───────────│  · Agent / 终端 / Git │
-│  · 任务列表 & 通知    │  页面状态   │  · MCP / Skills      │
-└──────────────────────┘            └──────────────────────┘
+Android phone                          Computer
++----------------------------+         +----------------------------+
+| ZCode Mobile               |         | ZCode Desktop              |
+|                            |  Remote |                            |
+|  scan QR / paste link      |   URL   |  Mobile Remote Control     |
+|  official Remote page      | ------> |  page                      |
+|    in a WebView            |         |                            |
+|  task list, notifications  | <------ |  Agent / terminal / Git    |
+|                            |  page   |  MCP / Skills              |
+|                            |  state  |                            |
++----------------------------+         +----------------------------+
 ```
 
 不逆向、不伪造私有协议：App 内嵌的就是官方 Remote 页面，任务和确认请求是从页面**可见内容**里识别出来的。识别不到时页面照常可用，原生列表只是留空。
