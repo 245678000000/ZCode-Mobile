@@ -32,7 +32,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.foundation.isSystemInDarkTheme
 import app.zcode.mobile.data.ThemeMode
 import app.zcode.mobile.model.Artifact
-import kotlinx.coroutines.flow.map
 import app.zcode.mobile.model.MessageReceived
 import app.zcode.mobile.model.relatedTaskId
 import app.zcode.mobile.navigation.Routes
@@ -62,7 +61,8 @@ class MainActivity : ComponentActivity() {
         runCatching { enableEdgeToEdge() }
         consumeIntent(intent)
         setContent {
-            val themeMode by appViewModel.settings.map { it.themeMode }.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
+            val appSettings by appViewModel.settings.collectAsStateWithLifecycle()
+            val themeMode = appSettings.themeMode
             val systemDark = isSystemInDarkTheme()
             val useDark = when (themeMode) {
                 ThemeMode.SYSTEM -> systemDark
