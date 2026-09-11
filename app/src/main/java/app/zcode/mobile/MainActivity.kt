@@ -29,7 +29,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.foundation.isSystemInDarkTheme
+import app.zcode.mobile.data.ThemeMode
 import app.zcode.mobile.model.Artifact
+import kotlinx.coroutines.flow.map
 import app.zcode.mobile.model.MessageReceived
 import app.zcode.mobile.model.relatedTaskId
 import app.zcode.mobile.navigation.Routes
@@ -59,7 +62,14 @@ class MainActivity : ComponentActivity() {
         runCatching { enableEdgeToEdge() }
         consumeIntent(intent)
         setContent {
-            ZCodeTheme {
+            val themeMode by appViewModel.settings.map { it.themeMode }.collectAsStateWithLifecycle(ThemeMode.SYSTEM)
+            val systemDark = isSystemInDarkTheme()
+            val useDark = when (themeMode) {
+                ThemeMode.SYSTEM -> systemDark
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            ZCodeTheme(darkTheme = useDark) {
                 val darkTheme = ZTheme.colors.isDark
                 LaunchedEffect(darkTheme) {
                     runCatching {
@@ -205,6 +215,7 @@ class MainActivity : ComponentActivity() {
                                             allowDownloads = settings.allowDownloads,
                                             allowExternalLinks = settings.allowExternalLinks,
                                             allowFileAccess = false,
+                                            darkTheme = useDark,
                                         ),
                                         sessionManager = appViewModel.sessionManager,
                                         bridge = appViewModel.webBridge,
@@ -235,6 +246,7 @@ class MainActivity : ComponentActivity() {
                             RemoteScreen(
                                 remoteUrl = url,
                                 settings = settings,
+                                darkTheme = useDark,
                                 online = online,
                                 sessionManager = appViewModel.sessionManager,
                                 bridge = appViewModel.webBridge,

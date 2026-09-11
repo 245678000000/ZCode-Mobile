@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -17,7 +18,11 @@ data class AppSettings(
     val allowDownloads: Boolean = true,
     val allowExternalLinks: Boolean = true,
     val developerMode: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
 )
+
+/** App + Remote page appearance. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 class SettingsStore(context: Context) {
     private val dataStore = context.applicationContext.settingsDataStore
@@ -30,6 +35,7 @@ class SettingsStore(context: Context) {
             allowDownloads = prefs[Keys.ALLOW_DOWNLOADS] ?: true,
             allowExternalLinks = prefs[Keys.ALLOW_EXTERNAL] ?: true,
             developerMode = prefs[Keys.DEVELOPER] ?: false,
+            themeMode = prefs[Keys.THEME]?.let { raw -> ThemeMode.entries.firstOrNull { it.name == raw } } ?: ThemeMode.SYSTEM,
         )
     }
 
@@ -39,6 +45,9 @@ class SettingsStore(context: Context) {
     suspend fun setAllowDownloads(value: Boolean) = set(Keys.ALLOW_DOWNLOADS, value)
     suspend fun setAllowExternalLinks(value: Boolean) = set(Keys.ALLOW_EXTERNAL, value)
     suspend fun setDeveloperMode(value: Boolean) = set(Keys.DEVELOPER, value)
+    suspend fun setThemeMode(value: ThemeMode) {
+        dataStore.edit { it[Keys.THEME] = value.name }
+    }
 
     private suspend fun set(key: Preferences.Key<Boolean>, value: Boolean) {
         dataStore.edit { it[key] = value }
@@ -51,5 +60,6 @@ class SettingsStore(context: Context) {
         val ALLOW_DOWNLOADS = booleanPreferencesKey("allow_downloads")
         val ALLOW_EXTERNAL = booleanPreferencesKey("allow_external_links")
         val DEVELOPER = booleanPreferencesKey("developer_mode")
+        val THEME = stringPreferencesKey("theme_mode")
     }
 }

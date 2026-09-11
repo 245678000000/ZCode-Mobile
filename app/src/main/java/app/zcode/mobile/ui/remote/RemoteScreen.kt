@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 fun RemoteScreen(
     remoteUrl: String,
     settings: AppSettings,
+    darkTheme: Boolean,
     online: Boolean,
     sessionManager: SessionManager,
     bridge: ZCodeWebBridge,
@@ -189,6 +190,7 @@ fun RemoteScreen(
                         allowDownloads = settings.allowDownloads,
                         allowExternalLinks = settings.allowExternalLinks,
                         allowFileAccess = false,
+                        darkTheme = darkTheme,
                     ),
                     sessionManager = sessionManager,
                     bridge = bridge,

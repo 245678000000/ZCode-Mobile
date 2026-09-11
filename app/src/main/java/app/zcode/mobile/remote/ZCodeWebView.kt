@@ -26,7 +26,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.ScriptHandler
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import app.zcode.mobile.BuildConfig
+import app.zcode.mobile.R
 import app.zcode.mobile.model.ConnectionState
 import app.zcode.mobile.util.AppLog
 import app.zcode.mobile.util.RemoteUrl
@@ -60,7 +64,30 @@ data class RemoteWebConfig(
     val allowDownloads: Boolean,
     val allowExternalLinks: Boolean,
     val allowFileAccess: Boolean,
+    /** Resolved appearance for the Remote page (system already applied). */
+    val darkTheme: Boolean = true,
 )
+
+/**
+ * The Remote page keeps its theme in localStorage["zcode-theme"] (zai-dark / zai-light)
+ * and applies it as classes on <html>. This script does both, so it works before the
+ * page boots (document-start) and at runtime when the setting changes.
+ */
+private fun themeScript(dark: Boolean): String {
+    val name = if (dark) "zai-dark" else "zai-light"
+    return """
+        (function(){
+          try { localStorage.setItem('zcode-theme', '$name'); } catch (e) {}
+          var h = document.documentElement;
+          if (!h) return;
+          h.classList.toggle('dark', ${dark});
+          h.classList.toggle('theme-zai-dark', ${dark});
+          h.classList.toggle('theme-zai-light', ${!dark});
+          h.setAttribute('data-zcode-bootstrap-theme', '${if (dark) "dark" else "light"}');
+          h.style.colorScheme = '${if (dark) "dark" else "light"}';
+        })();
+    """.trimIndent()
+}
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -82,6 +109,17 @@ fun ZCodeWebView(
 ) {
     val origin = remember(config.remoteUrl) { RemoteUrl.origin(config.remoteUrl) }
     val httpsRemote = remember(config.remoteUrl) { RemoteUrl.parse(config.remoteUrl)?.isHttps == true }
+    // Document-start hook for the theme; replaced whenever the setting changes.
+    val startScript = remember { arrayOfNulls<ScriptHandler>(1) }
+    fun applyTheme(view: WebView, dark: Boolean) {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            runCatching { startScript[0]?.remove() }
+            startScript[0] = runCatching {
+                WebViewCompat.addDocumentStartJavaScript(view, themeScript(dark), setOf("*"))
+            }.getOrNull()
+        }
+        view.evaluateJavascript(themeScript(dark), null)
+    }
 
     DisposableEffect(Unit) {
         onDispose { sessionManager.persist() }
@@ -101,6 +139,7 @@ fun ZCodeWebView(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
                 configureSettings(this, config, httpsRemote)
+                applyTheme(this, config.darkTheme)
                 sessionManager.attach(this)
                 removeJavascriptInterface(ZCodeWebBridge.JS_NAME)
                 removeJavascriptInterface(ZCodeWebBridge.LEGACY_JS_NAME)
@@ -250,6 +289,10 @@ fun ZCodeWebView(
         },
         update = { view ->
             webViewRef(view)
+            if (view.getTag(R.id.zcode_webview_theme) != config.darkTheme) {
+                view.setTag(R.id.zcode_webview_theme, config.darkTheme)
+                applyTheme(view, config.darkTheme)
+            }
         },
         onRelease = { view ->
             sessionManager.persist()

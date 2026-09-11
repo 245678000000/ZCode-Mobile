@@ -285,6 +285,33 @@ fun RoundAction(icon: ImageVector, contentDescription: String?, onClick: () -> U
     }
 }
 
+/** Compact segmented control, like the desktop's 分组 / 项目 tabs. */
+@Composable
+fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) {
+    val c = ZTheme.colors
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(c.surfaceLow)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        options.forEach { (value, label) ->
+            val active = value == selected
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (active) c.surface else Color.Transparent)
+                    .border(1.dp, if (active) c.line else Color.Transparent, RoundedCornerShape(6.dp))
+                    .clickable { onSelect(value) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            ) {
+                Text(label, color = if (active) c.fg else c.fgSecondary, fontSize = 12.sp, fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Status
 // ---------------------------------------------------------------------------

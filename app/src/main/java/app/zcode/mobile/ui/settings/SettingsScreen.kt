@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.zcode.mobile.BuildConfig
 import app.zcode.mobile.data.AppSettings
+import app.zcode.mobile.data.ThemeMode
 import app.zcode.mobile.data.SettingsStore
 import app.zcode.mobile.model.Device
 import app.zcode.mobile.ui.components.GroupLabel
@@ -27,6 +28,7 @@ import app.zcode.mobile.ui.components.Hairline
 import app.zcode.mobile.ui.components.ListRow
 import app.zcode.mobile.ui.components.PageInset
 import app.zcode.mobile.ui.components.ScreenHeader
+import app.zcode.mobile.ui.components.Segmented
 import app.zcode.mobile.ui.components.ToggleRow
 import app.zcode.mobile.ui.theme.ZTheme
 import app.zcode.mobile.util.RemoteUrl
@@ -100,6 +102,19 @@ fun SettingsScreen(
                 Hairline()
                 ListRow(title = "打开演示确认请求", onClick = onDemoApproval)
             }
+
+            GroupLabel("外观")
+            ListRow(
+                title = "主题",
+                caption = "同时作用于 App 和 Remote 页面",
+                trailing = {
+                    Segmented(
+                        options = listOf(ThemeMode.SYSTEM to "系统", ThemeMode.LIGHT to "浅色", ThemeMode.DARK to "深色"),
+                        selected = settings.themeMode,
+                        onSelect = { mode -> scope.launch { store.setThemeMode(mode) } },
+                    )
+                },
+            )
 
             GroupLabel("输入")
             ToggleRow("语音输入", settings.voiceEnabled, caption = "在首页输入框旁显示麦克风") {
