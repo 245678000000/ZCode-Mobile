@@ -56,7 +56,7 @@ Android phone                          Computer
 ### 已知限制
 
 - **仅前台**：Android 会在后台暂停 WebView 的 JavaScript。没有常驻服务、没有 wake lock，不承诺后台实时监控。
-- **选择器是启发式的**：`app/src/main/assets/zcode-selectors.json` 里的 DOM 选择器基于公开文档编写，尚未对真实 Remote 页面校验；`app/src/test/resources/fixtures` 是手写的替身。
+- **选择器已对真实页面校验**（Remote v4，ZCode 3.11）：任务行、会话标题、输入框、发送按钮、文件按钮都用页面自带的 `data-testid`；确认请求（变更前确认模式）的结构还没抓到，仍是启发式识别。
 - **确认是只读的**：出于安全考虑，允许/拒绝必须在 Remote 页面里点。
 
 ## 安装
@@ -132,7 +132,7 @@ app/src/main/assets/
 
 ## 路线
 
-- 拿真实 Remote 页面 DOM 校验并收紧选择器
+- 抓取「变更前确认」模式下的确认对话框结构，替换启发式识别
 - 若 ZCode 发布官方 API / SDK，改为原生通信
 - 多设备配置切换
 - 生物识别解锁已保存的连接

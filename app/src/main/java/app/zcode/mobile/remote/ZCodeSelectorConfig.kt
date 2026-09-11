@@ -16,6 +16,11 @@ data class ZCodeSelectorConfig(
     val agentMessage: List<String>,
     val errorBanner: List<String> = emptyList(),
     val errorAction: List<String> = emptyList(),
+    val sessionTitle: List<String> = emptyList(),
+    val sessionRunning: List<String> = emptyList(),
+    val sessionContainer: List<String> = emptyList(),
+    val composerInput: List<String> = emptyList(),
+    val composerSend: List<String> = emptyList(),
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("debounceMs", debounceMs)
@@ -29,6 +34,11 @@ data class ZCodeSelectorConfig(
         put("agentMessage", agentMessage.toJsonArray())
         put("errorBanner", errorBanner.toJsonArray())
         put("errorAction", errorAction.toJsonArray())
+        put("sessionTitle", sessionTitle.toJsonArray())
+        put("sessionRunning", sessionRunning.toJsonArray())
+        put("sessionContainer", sessionContainer.toJsonArray())
+        put("composerInput", composerInput.toJsonArray())
+        put("composerSend", composerSend.toJsonArray())
     }
 
     private fun List<String>.toJsonArray(): JSONArray {
@@ -63,6 +73,11 @@ data class ZCodeSelectorConfig(
                 agentMessage = arr("agentMessage"),
                 errorBanner = arr("errorBanner"),
                 errorAction = arr("errorAction"),
+                sessionTitle = arr("sessionTitle"),
+                sessionRunning = arr("sessionRunning"),
+                sessionContainer = arr("sessionContainer"),
+                composerInput = arr("composerInput"),
+                composerSend = arr("composerSend"),
             )
         }
     }

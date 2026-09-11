@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -34,7 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -95,16 +96,18 @@ fun HomeScreen(
             .background(c.surface)
             .imePadding(),
     ) {
-        // The shared WebView is hosted here at real screen size but parked below the
-        // viewport: a 1dp host gave the page a 1px viewport, which some layouts never recover from.
+        // The shared WebView is hosted here at real screen size but placed just below the
+        // viewport: a tiny host gave the page a tiny viewport, which some layouts never recover from.
         val screen = LocalConfiguration.current
-        Box(Modifier.size(1.dp)) {
-            Box(
-                Modifier
-                    .requiredSize(screen.screenWidthDp.dp, screen.screenHeightDp.dp)
-                    .offset(y = screen.screenHeightDp.dp + 64.dp),
-            ) { observerSlot() }
-        }
+        val density = LocalDensity.current
+        Box(
+            Modifier.layout { measurable, _ ->
+                val w = with(density) { screen.screenWidthDp.dp.roundToPx() }
+                val h = with(density) { screen.screenHeightDp.dp.roundToPx() }
+                val placeable = measurable.measure(Constraints.fixed(w, h))
+                layout(0, 0) { placeable.place(0, h * 2) }
+            },
+        ) { observerSlot() }
 
         // Top bar: wordmark left, connection + settings right.
         Row(

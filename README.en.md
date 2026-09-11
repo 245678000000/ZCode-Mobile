@@ -56,7 +56,7 @@ The design follows ZCode Desktop: white ground, system sans, plain hairline list
 ### Known limitations
 
 - **Foreground only.** Android pauses WebView JavaScript in the background. No foreground service, no wake lock, no background monitoring claims.
-- **Heuristic selectors.** The DOM selectors in `app/src/main/assets/zcode-selectors.json` were written from public docs and have not been validated against a live Remote page; the fixtures under `app/src/test/resources/fixtures` are hand-written stand-ins.
+- **Selectors validated against the live page** (Remote v4, ZCode 3.11): task rows, session title, composer, send button and file buttons use the page's own `data-testid`s. The approval prompt (ask-before-edit mode) has not been captured yet and is still detected heuristically.
 - **Approvals are read-only.** Allow/deny must be tapped on the Remote page.
 
 ## Install
@@ -132,7 +132,7 @@ app/src/main/assets/
 
 ## Roadmap
 
-- Validate and tighten selectors against a live Remote page DOM
+- Capture the ask-before-edit approval dialog and replace the heuristic detection
 - Native transport if ZCode publishes an official API / SDK
 - Multiple device profiles
 - Biometric unlock for the saved connection

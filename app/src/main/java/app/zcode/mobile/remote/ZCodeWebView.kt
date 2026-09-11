@@ -70,7 +70,8 @@ fun ZCodeWebView(
     bridge: ZCodeWebBridge,
     modifier: Modifier = Modifier,
     observer: ZCodeDomObserver? = null,
-    retainedWebView: WebView? = null,
+    /** Resolved inside the AndroidView factory only, so recompositions never touch the view. */
+    retainedWebView: (() -> WebView?)? = null,
     onState: (RemotePageState) -> Unit,
     onDownload: (String, String?, String?) -> Unit,
     onConnection: (ConnectionState) -> Unit = {},
@@ -89,7 +90,7 @@ fun ZCodeWebView(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            val webView = retainedWebView?.also { existing ->
+            val webView = retainedWebView?.invoke()?.also { existing ->
                 (existing.parent as? ViewGroup)?.removeView(existing)
             } ?: WebView(MutableContextWrapper(context.applicationContext))
             // Bind to the hosting Activity only while attached; released below.
@@ -289,7 +290,8 @@ private fun configureSettings(webView: WebView, config: RemoteWebConfig, httpsRe
         }
     }
     CookieManager.getInstance().setAcceptCookie(true)
-    WebView.setWebContentsDebuggingEnabled(false)
+    // chrome://inspect works only for debug builds.
+    WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 }
 
 private fun handleUrl(

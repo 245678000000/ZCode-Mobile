@@ -13,7 +13,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -209,9 +208,9 @@ class MainActivity : ComponentActivity() {
                                         ),
                                         sessionManager = appViewModel.sessionManager,
                                         bridge = appViewModel.webBridge,
-                                        modifier = Modifier.size(1.dp),
+                                        modifier = Modifier.fillMaxSize(),
                                         observer = appViewModel.observer,
-                                        retainedWebView = appViewModel.ensureWebView(this@MainActivity),
+                                        retainedWebView = { appViewModel.ensureWebView(this@MainActivity) },
                                         onState = { appViewModel.updatePageState(it) },
                                         onDownload = { u, n, m -> appViewModel.enqueueDownload(u, n, m) },
                                         onConnection = { appViewModel.events.ingestConnection(it) },
@@ -240,7 +239,7 @@ class MainActivity : ComponentActivity() {
                                 sessionManager = appViewModel.sessionManager,
                                 bridge = appViewModel.webBridge,
                                 observer = appViewModel.observer,
-                                retainedWebView = appViewModel.ensureWebView(this@MainActivity),
+                                retainedWebView = { appViewModel.ensureWebView(this@MainActivity) },
                                 pageState = pageState,
                                 pageProgress = pageProgress,
                                 onPageState = { appViewModel.updatePageState(it) },

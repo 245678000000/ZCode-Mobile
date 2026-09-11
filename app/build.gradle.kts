@@ -11,8 +11,8 @@ android {
         applicationId = "app.zcode.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.2.2"
+        versionCode = 5
+        versionName = "0.2.3"
         vectorDrawables.useSupportLibrary = true
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -63,6 +63,8 @@ android {
             isMinifyEnabled = false
             applicationIdSuffix = ""
             versionNameSuffix = "-debug"
+            // Same key as release so a debug build installs over a release one on a test phone.
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("boolean", "SENSITIVE_LOGS", "false")
         }
         release {

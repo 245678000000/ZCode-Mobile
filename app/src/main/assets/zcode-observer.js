@@ -43,6 +43,13 @@
       });
       return out.filter(visible);
     }
+    function qsAllAny(selectors) {
+      var out = [];
+      (selectors || []).forEach(function (s) {
+        try { out = out.concat(Array.prototype.slice.call(document.querySelectorAll(s))); } catch (e) {}
+      });
+      return out;
+    }
     function textOf(el) {
       return sanitize((el && (el.innerText || el.textContent) || '').replace(/\s+/g, ' ').trim(), 240);
     }
@@ -66,7 +73,7 @@
     var REJECT_RE = /^(reject|deny|refuse|拒绝|不允许)$/i;
     var WAIT_RE = /(waiting for|waiting approval|needs confirmation|permission|authorization|等待确认|需要确认|需要授权|等待授权)/i;
     var FILE_RE = /\.(md|html|htm|png|jpe?g|webp|gif|pdf|json|kt|java|ts|tsx|js|py|go|rs|sh|txt)(\?|$)/i;
-    var EXPIRED_RE = /(session expired|登录过期|会话过期|连接已断开|disconnected|unauthorized)/i;
+    var EXPIRED_RE = /(session expired|登录过期|会话过期|连接已断开|disconnected|unauthorized|已被其他设备接管|手机连接已失效|鉴权信息已经失效)/i;
 
     function statusFrom(t) {
       if (!t) return '';
@@ -96,6 +103,18 @@
         // The id must NOT depend on status, otherwise a status change looks like a new task.
         if (title && (status || title.length > 1)) push(row.getAttribute('data-testid') || hash(title), title, status, '', '');
       });
+      // Session view (one task open): the title lives in a hidden span's data-title and
+      // "running" is the active turn-navigator item. No list rows exist here.
+      if (tasks.length === 0) {
+        var st = qsAllAny(cfg.sessionTitle)[0];
+        var container = qsAllAny(cfg.sessionContainer)[0];
+        var stitle = st ? (st.getAttribute('data-title') || textOf(st)) : '';
+        if (stitle) {
+          var running = qsAll(cfg.sessionRunning).length > 0;
+          var sid = container ? container.getAttribute('data-session-id') : '';
+          push(sid ? 'task-item-' + sid : hash(stitle), stitle, running ? '运行中' : '', '', '');
+        }
+      }
       if (tasks.length === 0) {
         var headings = qsAll(cfg.taskTitle);
         headings.slice(0, 8).forEach(function (h) {
@@ -185,8 +204,8 @@
       var out = [];
       var seen = {};
       nodes.forEach(function (n) {
-        var href = n.getAttribute('href') || n.getAttribute('src') || '';
-        var name = n.getAttribute('download') || n.getAttribute('aria-label') || textOf(n) || (href.split('/').pop() || '');
+        var href = n.getAttribute('href') || n.getAttribute('src') || n.getAttribute('title') || '';
+        var name = n.getAttribute('download') || (n.getAttribute('title') ? textOf(n) : n.getAttribute('aria-label')) || textOf(n) || (href.split('/').pop() || '');
         name = sanitize(name, 80);
         if (!name || seen[name]) return;
         if (!FILE_RE.test(name) && !FILE_RE.test(href)) return;

@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.MutableContextWrapper
 import android.net.Uri
 import android.os.Environment
-import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.lifecycle.AndroidViewModel
@@ -143,11 +142,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
      * to the application context on release, so no Activity is ever retained here.
      */
     fun ensureWebView(context: Context): WebView? {
-        val existing = webView
-        if (existing != null) {
-            (existing.parent as? ViewGroup)?.removeView(existing)
-            return existing
-        }
+        // Never detach here: this runs from an AndroidView factory, which is the only place
+        // that may move the view between hosts. Detaching during composition orphaned it.
+        webView?.let { return it }
         return runCatching { WebView(MutableContextWrapper(context.applicationContext)) }
             .onFailure { AppLog.e("AppViewModel", "WebView create failed", it) }
             .getOrNull()

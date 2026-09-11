@@ -60,7 +60,7 @@ fun RemoteScreen(
     sessionManager: SessionManager,
     bridge: ZCodeWebBridge,
     observer: ZCodeDomObserver,
-    retainedWebView: WebView?,
+    retainedWebView: () -> WebView?,
     pageState: RemotePageState,
     pageProgress: Int,
     onPageState: (RemotePageState) -> Unit,
@@ -88,18 +88,24 @@ fun RemoteScreen(
         onConnected(pageState is RemotePageState.Ready)
     }
 
-    // The Remote page is a SPA; its composer may render after onPageFinished, so retry.
+    // The Remote page is a SPA: the composer only exists inside a session, and it renders a
+    // moment after navigation. The fill script opens the current session when needed
+    // ("navigated"), so keep retrying; the draft is only consumed once it was delivered.
     LaunchedEffect(pageState, pendingInject, webView) {
         val view = webView ?: return@LaunchedEffect
-        if (pageState !is RemotePageState.Ready || pendingInject == null) return@LaunchedEffect
-        val text = onConsumeInject() ?: return@LaunchedEffect
-        repeat(12) { attempt ->
+        if (pageState !is RemotePageState.Ready) return@LaunchedEffect
+        val text = pendingInject ?: return@LaunchedEffect
+        repeat(20) { attempt ->
             val result = suspendCancellableCoroutine<ZCodeWebBridge.BridgeResult> { cont ->
-                bridge.fillComposer(view, text) { if (cont.isActive) cont.resume(it) }
+                bridge.fillComposer(view, text, send = true) { if (cont.isActive) cont.resume(it) }
             }
-            if (result == ZCodeWebBridge.BridgeResult.Filled) return@LaunchedEffect
-            delay(if (attempt < 4) 400L else 1000L)
+            if (result == ZCodeWebBridge.BridgeResult.Filled) {
+                onConsumeInject()
+                return@LaunchedEffect
+            }
+            delay(if (result == ZCodeWebBridge.BridgeResult.Navigated || attempt < 4) 600L else 1000L)
         }
+        onConsumeInject()
     }
 
     BackHandler {

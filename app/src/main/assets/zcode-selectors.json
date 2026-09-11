@@ -1,6 +1,7 @@
 {
   "debounceMs": 500,
   "taskTitle": [
+    "button[data-testid^='task-item-'] > span:nth-child(2) > span:first-child",
     "[data-testid*='task-title']",
     "[data-testid*='session-title']",
     "[data-testid*='task'] [data-testid*='title']",
@@ -10,13 +11,14 @@
     "h2"
   ],
   "taskStatus": [
+    "button[data-testid^='task-item-'] > span:last-child",
     "[data-testid*='status']",
     "[data-status]",
     "[aria-label*='status']",
     "[aria-label*='状态']"
   ],
   "taskRow": [
-    "[data-testid*='task-item']",
+    "button[data-testid^='task-item-']",
     "[data-testid*='task-row']",
     "[role='listitem']",
     "[role='option']"
@@ -43,6 +45,7 @@
     "button[aria-label*='拒绝']"
   ],
   "artifact": [
+    "button[data-slot='context-menu-trigger'][title]",
     "[data-testid*='artifact']",
     "[data-testid*='file']",
     "a[download]",
@@ -53,6 +56,7 @@
     "a[href$='.json']"
   ],
   "agentMessage": [
+    "[data-testid^='v4-row-']:has([data-testid^='v4-feedback-like-'])",
     "[data-testid*='message']",
     "[data-testid*='assistant']",
     "[data-role='assistant']",
@@ -70,5 +74,20 @@
     "button",
     "a",
     "[role='button']"
+  ],
+  "sessionTitle": [
+    "[data-testid='v4-session-title']"
+  ],
+  "sessionRunning": [
+    "[data-testid^='v4-turn-navigator-item-'][data-running='true']"
+  ],
+  "sessionContainer": [
+    "[data-session-id]"
+  ],
+  "composerInput": [
+    "[data-testid='v4-composer-input']"
+  ],
+  "composerSend": [
+    "[data-testid='v4-composer-send']"
   ]
 }
