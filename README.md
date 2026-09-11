@@ -1,183 +1,142 @@
-# ZCode Mobile
+<h1 align="center">ZCode Mobile</h1>
 
-Unofficial Android Remote Client for ZCode.
+<p align="center">ZCode Desktop 的非官方 Android 远程控制客户端。</p>
 
-ZCode Mobile allows users to remotely control their ZCode Desktop sessions from Android devices.
+<p align="center">
+  <a href="./README.en.md">English</a> | <a href="./README.md">简体中文</a>
+</p>
 
-This app is **not** a coding agent running on the phone. The phone is a control surface. ZCode Desktop on your computer remains the execution environment for code, terminal, Git, files, browser, MCP, Skills, and Agent work.
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-4B5563?style=flat-square" alt="Android 8.0+">
+  <img src="https://img.shields.io/badge/Target%20SDK-API%2036-4B5563?style=flat-square" alt="API 36">
+  <img src="https://img.shields.io/badge/Kotlin-2.3.21-3776AB?style=flat-square" alt="Kotlin 2.3.21">
+  <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-3776AB?style=flat-square" alt="Jetpack Compose">
+</p>
 
-```
-Android App
-  → ZCode Remote Control / Remote Web
-    → ZCode Desktop on your computer
-      → local code, terminal, Git, files, browser, MCP, Skill, Agent
-```
+手机只是控制面板。代码、终端、Git、MCP、Skills 和 Agent 都还在电脑上的 ZCode Desktop 里跑，手机通过 ZCode 自带的「移动端远程控制」页面看进度、发任务、收通知。
 
-## Features
-
-- Scan a ZCode Remote Control QR code
-- Paste a Remote URL
-- Save the connection with encrypted storage
-- Auto-open the last session on launch
-- Load the official ZCode Remote page in a WebView
-- Back / forward, refresh, reconnect
-- Network and Remote error handling
-- Speech-to-text task input
-- Share-to-app entry
-- Structured task list from visible Remote page state (v0.2)
-- Task / approval / artifact event detection via DOM observer (v0.2)
-- Task-completed / task-failed / approval notifications while the app is in the foreground (v0.2)
-- Artifact preview (Markdown, HTML, image, PDF, code, JSON)
-- Settings for voice, notifications, downloads, and WebView data
-
-## v0.2
-
-- Task event detection from the Remote page (MutationObserver, no private API)
-- Approval detection with a two-signal rule (dialog/buttons/waiting/command)
-- Artifact detection from visible file links
-- Structured Home / Task Detail UI
-- Notification integration for TaskCompleted, TaskFailed, ApprovalRequired
-- Developer debug panel (debug builds)
-- Unit tests for parse, status, dedupe, approval, artifacts, URL, storage codec
-
-Foreground only: Android may pause WebView JavaScript when the app is backgrounded. v0.2 does **not** claim realtime background monitoring, and does not use a persistent foreground service, wake lock, or WorkManager.
-
-If the observer cannot read the page, the WebView still works. Native task UI simply stays empty instead of showing fake data.
-
-Known limitation: the DOM selectors in `app/src/main/assets/zcode-selectors.json` are heuristics written from public ZCode docs, not from a captured live Remote page. Expect to tune them against the real UI; the test fixtures under `app/src/test/resources/fixtures` are hand-written stand-ins.
-
-Approval detection is read-only. The app never clicks Allow / Reject on the page for you; the approval screen deep-links you to the Remote page instead.
-
-On Android 13+, the notification permission is requested the first time Home is shown (and again when a notification toggle is turned on in Settings).
-
-## Architecture
-
-```
-Android phone = controller
-ZCode Desktop = executor
+```text
+Android 手机                         电脑
+┌──────────────────────┐            ┌──────────────────────┐
+│ ZCode Mobile         │  Remote URL │ ZCode Desktop        │
+│  · 扫码 / 粘贴链接    │───────────▶│  · 移动端远程控制页面 │
+│  · 内嵌官方 Remote 页 │◀───────────│  · Agent / 终端 / Git │
+│  · 任务列表 & 通知    │  页面状态   │  · MCP / Skills      │
+└──────────────────────┘            └──────────────────────┘
 ```
 
-MVP stack:
+不逆向、不伪造私有协议：App 内嵌的就是官方 Remote 页面，任务和确认请求是从页面**可见内容**里识别出来的。识别不到时页面照常可用，原生列表只是留空。
 
-- Kotlin
-- Jetpack Compose + Material 3
-- Navigation Compose
-- Android WebView (official Remote Control page)
-- CameraX + ML Kit barcode scanning
-- Android SpeechRecognizer
-- Android Keystore AES-GCM
-- DOM observer + JavaScript bridge (visible page state only)
-- DataStore
-- Notification API
+## 界面
 
-The first version does **not** reverse-engineer ZCode, forge private APIs, or patch the desktop app. If ZCode later publishes an official API, SDK, WebSocket protocol, or deep link, this client can grow into a native remote client.
+<p align="center">
+  <img src="docs/screenshots/overview.png" alt="首页、连接、确认请求、任务详情、设置" width="100%">
+</p>
 
-## Installation
+设计跟随 ZCode 桌面端：白底、系统字体、没有卡片的纯列表、一个输入框、黑色圆形发送按钮，橙色只在「需要你确认」时出现。深色模式跟随系统。
 
-1. Enable unknown sources / install from this computer on your Android device.
-2. Download the pre-built APK (`zcode-mobile-*-release.apk`) directly from [GitHub Releases](https://github.com/245678000000/ZCode-Mobile/releases), or compile it locally (`app/build/outputs/apk/release/app-release.apk`).
-3. Install the APK on your phone.
+> 上图是按 Compose 实现绘制的设计稿，不是真机截图。
 
-Minimum Android version: **8.0 (API 26)**.
+## 功能
 
-## Build
+| | |
+|---|---|
+| **连接** | 扫描电脑端二维码，或粘贴「复制链接」得到的地址。链接用 Android Keystore 的 AES-GCM 密钥加密保存。 |
+| **首页输入框** | 像桌面端一样直接打字，内容会填进 Remote 页面的输入框；也可以用语音。 |
+| **任务列表** | 从 Remote 页面识别任务，按「等待确认 / 进行中 / 最近」分组。 |
+| **通知** | 任务完成、失败、Agent 等待确认时推送系统通知（前台运行时）。 |
+| **确认请求** | 显示 Agent 想执行的命令和启发式风险等级。App **不会**替你点击允许/拒绝，只把你带到 Remote 页面。 |
+| **产物预览** | Markdown、HTML、图片、PDF、代码、JSON。 |
+| **系统分享** | 从其他 App 把报错信息、文本分享进来直接发给 Agent。 |
 
-Requirements:
+### 已知限制
 
-- JDK 17
-- Android SDK with `platforms;android-36` and Build Tools 36
-- Network access to Google Maven
+- **仅前台**：Android 会在后台暂停 WebView 的 JavaScript。没有常驻服务、没有 wake lock，不承诺后台实时监控。
+- **选择器是启发式的**：`app/src/main/assets/zcode-selectors.json` 里的 DOM 选择器基于公开文档编写，尚未对真实 Remote 页面校验；`app/src/test/resources/fixtures` 是手写的替身。
+- **确认是只读的**：出于安全考虑，允许/拒绝必须在 Remote 页面里点。
+
+## 安装
+
+最低 Android 8.0（API 26）。
+
+1. 从 [Releases](https://github.com/245678000000/ZCode-Mobile/releases) 下载 `zcode-mobile-*-release.apk`，或本地编译。
+2. 手机上允许安装未知来源应用，安装即可。
+
+## 使用
+
+1. 电脑上打开 ZCode Desktop，点左下角 **移动端远程控制**。
+2. 手机上打开 ZCode Mobile，**扫描二维码**，或点电脑端 **复制链接** 后在手机上 **粘贴连接地址**。
+   - `https://` 任意主机都接受；`http://` 只接受局域网、回环、`.local`、link-local 和 CGNAT（Tailscale）地址，因为链接路径里带会话密钥。
+3. 连接后回到首页，直接输入任务发送，或点 **打开 Remote 页面** 使用完整界面。
+4. Android 13+ 第一次进首页会申请通知权限；在设置里打开通知开关时也会申请。
+
+## 编译
+
+需要 JDK 17、Android SDK（Platform 36 + Build Tools 36），`local.properties` 里写好 `sdk.dir`。
 
 ```bash
-export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
-export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"
+export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"   # macOS Homebrew 示例
 ./gradlew assembleDebug
-```
-
-Debug APK:
-
-```
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-Release APK:
-
-```bash
+./gradlew testDebugUnitTest lintDebug
 ./gradlew assembleRelease
 ```
 
-Release signing is resolved in this order:
+Release 签名按以下顺序查找：
 
-1. `RELEASE_STORE_FILE` / `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_ALIAS` / `RELEASE_KEY_PASSWORD` environment variables (used by CI)
-2. `keystore.properties` at the repo root (git-ignored):
-
-   ```
+1. 环境变量 `RELEASE_STORE_FILE` / `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_ALIAS` / `RELEASE_KEY_PASSWORD`（CI 用）
+2. 仓库根目录的 `keystore.properties`（已 git-ignore）：
+   ```properties
    storeFile=app/keystore/your-release.jks
    storePassword=…
    keyAlias=…
    keyPassword=…
    ```
-3. The debug keystore, with a warning. Such a build installs but cannot be upgraded by a build signed elsewhere.
+3. 都没有则用 debug keystore 并给出警告——这种包能装，但换台机器编译的包无法覆盖升级。
 
-### Publishing from GitHub Actions
+### GitHub Actions 发布
 
-`.github/workflows/release.yml` builds and attaches APKs to a GitHub Release on every `v*` tag. It refuses to run without a real keystore so every Release is signed with the same key and users can upgrade in place. Add these repository secrets once:
+`.github/workflows/release.yml` 在推送 `v*` tag 时构建并上传 APK 到 GitHub Release。为了让每个 Release 都用同一把密钥签名（用户才能原地升级），没有配置密钥时工作流会直接失败。需要在仓库 Secrets 里配置一次：
 
-| Secret | Value |
-| --- | --- |
+| Secret | 值 |
+|---|---|
 | `RELEASE_KEYSTORE_BASE64` | `base64 -i app/keystore/your-release.jks` |
-| `RELEASE_STORE_PASSWORD` | keystore password |
-| `RELEASE_KEY_ALIAS` | key alias |
-| `RELEASE_KEY_PASSWORD` | key password |
+| `RELEASE_STORE_PASSWORD` | keystore 密码 |
+| `RELEASE_KEY_ALIAS` | 密钥别名 |
+| `RELEASE_KEY_PASSWORD` | 密钥密码 |
 
-Output:
+## 安全
 
+- Remote 链接用 AES-GCM 加密，密钥在 Android Keystore 里，不落明文。
+- 界面上的路径令牌打码；日志不打印 token、cookie、Authorization、session id。Release 只输出脱敏后的错误日志。
+- HTTPS 页面禁止混合内容；第三方 Cookie 关闭；`file://` 与 content 访问关闭。
+- 公网 `http://` 链接直接拒绝。
+
+## 目录
+
+```text
+app/src/main/java/app/zcode/mobile/
+├── remote/        WebView、JS 桥、DOM 观察器、事件解析与去重
+├── model/         Task / Approval / Artifact / 事件模型
+├── notification/  通知
+├── security/      Keystore 加密存储
+├── ui/            Compose 界面（theme / components / 各页面）
+└── util/          URL 校验、日志脱敏
+app/src/main/assets/
+├── zcode-observer.js       注入 Remote 页面的 MutationObserver
+└── zcode-selectors.json    DOM 选择器配置
 ```
-app/build/outputs/apk/release/app-release.apk
-```
 
-`local.properties` must contain your SDK path:
+## 路线
 
-```
-sdk.dir=/path/to/Android/sdk
-```
+- 拿真实 Remote 页面 DOM 校验并收紧选择器
+- 若 ZCode 发布官方 API / SDK，改为原生通信
+- 多设备配置切换
+- 生物识别解锁已保存的连接
 
-## Usage
+## 免责声明
 
-1. On the computer, open ZCode Desktop and enable **Remote Control**.
-2. On the phone, open ZCode Mobile.
-3. Scan the QR code, or paste the Remote URL. `https://` works for any host; `http://` is accepted only for LAN, loopback, `.local`, link-local and CGNAT (Tailscale) addresses.
-4. Tap **连接**, then **打开 ZCode**.
-5. Use the official Remote page to talk to the desktop agent.
-6. Optional: tap **语音任务**, speak, then **发送到 ZCode**.
+非官方社区项目。ZCode 及相关商标归其所有者所有，本项目与 ZCode 官方无隶属或背书关系。
 
-If a Remote URL is already saved, launch goes straight to the Remote page.
+## Star 历史
 
-## Security
-
-- Remote URLs are encrypted with AES-GCM. The key is stored in Android Keystore and never written to disk in plaintext.
-- UI redacts path tokens. Logs never print tokens, cookies, Authorization headers, or session IDs.
-- Release builds log errors (sanitized) but never debug output.
-- HTTPS Remote pages block mixed HTTP content.
-- `file://` and content access stay off unless a future setting explicitly needs them.
-- Third-party cookies are disabled; the Remote page is single-origin.
-- Plain `http://` Remote URLs are only accepted for private-network hosts, because the URL path carries the session secret.
-
-This client talks only to the Remote URL you provide. It does not include a hidden C2, account dump, or unofficial ZCode protocol.
-
-## Roadmap
-
-- Native client if ZCode publishes an official remote protocol
-- Real task-status stream instead of demo notifications
-- Real permission-approval protocol
-- Richer artifact sync from the desktop session
-- Multi-device profiles
-- Biometric unlock for saved connections
-
-## Disclaimer
-
-This is an unofficial community client for ZCode.
-
-ZCode and related trademarks belong to their respective owners.
-
-This project does not impersonate an official ZCode product.
+[![Star History Chart](https://api.star-history.com/svg?repos=245678000000%2FZCode-Mobile&type=Date)](https://star-history.com/#245678000000/ZCode-Mobile&Date)
